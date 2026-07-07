@@ -21,7 +21,7 @@ export const buildAmllDbLyricsUrl = (platform: AmllDbPlatform, musicId: number |
 
 const buildAmllDbRequestUrl = (platform: AmllDbPlatform, musicId: number | string): string => {
     const targetUrl = buildAmllDbLyricsUrl(platform, musicId);
-    return getElectronBridge() ? targetUrl : `/api/lyric-proxy?url=${encodeURIComponent(targetUrl)}`;
+    return getElectronBridge() ? targetUrl : `${import.meta.env.BASE_URL}api/lyric-proxy?url=${encodeURIComponent(targetUrl)}`;
 };
 
 async function requestAmllDb(platform: AmllDbPlatform, musicId: number | string): Promise<{ ok: boolean; status: number; text: () => Promise<string> }> {

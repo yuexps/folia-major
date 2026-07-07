@@ -39,7 +39,7 @@ async function requestQQ(method: string, module: string, param: any): Promise<an
   };
 
   const targetUrl = 'https://u.y.qq.com/cgi-bin/musicu.fcg';
-  const url = isElectron ? targetUrl : `/api/lyric-proxy?url=${encodeURIComponent(targetUrl)}`;
+  const url = isElectron ? targetUrl : `${import.meta.env.BASE_URL}api/lyric-proxy?url=${encodeURIComponent(targetUrl)}`;
 
   const response = await fetch(url, {
     method: 'POST',
