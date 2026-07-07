@@ -111,6 +111,8 @@ type NowPlayingProviderCallbacks = {
     onLyric?: (lyric: NowPlayingLyricPayload | null) => void;
     onPauseState?: (isPaused: boolean) => void;
     onProgress?: (update: NowPlayingProgressUpdate) => void;
+    onQueue?: (queue: any[]) => void;
+    onLoopMode?: (loopMode: 'all' | 'one' | 'off') => void;
 };
 
 const clampProgressMs = (value: unknown): number => {
@@ -255,15 +257,94 @@ export class NowPlayingProvider {
         return this.snapshot;
     }
 
+    private handlePostMessage = (event: MessageEvent) => {
+        const { type, data } = event.data || {};
+        if (type === '2fmusic-track') {
+            const track = normalizeNowPlayingTrack(data);
+            if (this.debug) {
+                console.log('[NowPlaying][iframe] Received track:', track);
+            }
+            if (areTracksEqual(this.snapshot.track, track)) {
+                return;
+            }
+            this.snapshot = {
+                ...this.snapshot,
+                track,
+            };
+            if (track) {
+                this.callbacks.onTrack?.(track);
+            }
+        } else if (type === '2fmusic-lyric') {
+            const lyric = normalizeNowPlayingLyricPayload(data);
+            if (this.debug) {
+                console.log('[NowPlaying][iframe] Received lyric:', lyric);
+            }
+            if (areLyricsEqual(this.snapshot.lyric, lyric)) {
+                return;
+            }
+            this.snapshot = {
+                ...this.snapshot,
+                lyric,
+            };
+            this.callbacks.onLyric?.(lyric);
+        } else if (type === '2fmusic-state') {
+            const isPaused = Boolean(data?.isPaused);
+            const progressMs = clampProgressMs(data?.progressMs);
+            const loopMode = data?.loopMode as 'all' | 'one' | 'off' | undefined;
+            if (this.debug) {
+                console.log('[NowPlaying][iframe] Received state:', { isPaused, progressMs, loopMode });
+            }
+            this.snapshot = {
+                ...this.snapshot,
+                isPaused,
+                progressMs,
+            };
+            this.callbacks.onPauseState?.(isPaused);
+            this.callbacks.onProgress?.({ progressMs, isReplay: false, quality: 'precise' });
+            if (loopMode) {
+                this.callbacks.onLoopMode?.(loopMode);
+            }
+        } else if (type === '2fmusic-progress') {
+            const progressMs = clampProgressMs(data?.progressMs);
+            this.snapshot = {
+                ...this.snapshot,
+                progressMs,
+            };
+            this.callbacks.onProgress?.({ progressMs, isReplay: false, quality: 'precise' });
+        } else if (type === '2fmusic-queue') {
+            const queue = Array.isArray(data?.queue) ? data.queue : [];
+            if (this.debug) {
+                console.log('[NowPlaying][iframe] Received queue:', queue);
+            }
+            this.callbacks.onQueue?.(queue);
+        }
+    };
+
     start() {
         this.stopped = false;
         this.clearReconnectTimer();
+
+        const isEmbedded = typeof window !== 'undefined' && window.self !== window.top;
+
+        if (isEmbedded) {
+            this.updateConnectionStatus('connected');
+            window.addEventListener('message', this.handlePostMessage);
+            window.parent.postMessage({ type: 'folia-ready' }, '*');
+            return;
+        }
+
         this.openSocket();
     }
 
     stop({ reset = true }: { reset?: boolean } = {}) {
         this.stopped = true;
         this.clearReconnectTimer();
+
+        const isEmbedded = typeof window !== 'undefined' && window.self !== window.top;
+
+        if (isEmbedded) {
+            window.removeEventListener('message', this.handlePostMessage);
+        }
 
         if (this.socket) {
             this.socket.onopen = null;

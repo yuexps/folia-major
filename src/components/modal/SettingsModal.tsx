@@ -157,7 +157,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         subtitleFontFallbackFamilies,
         lyricFilterPattern,
         showOpenPanelCloseButton,
-        enableNowPlayingStage,
+        enableNowPlayingStage: enableNowPlayingStageFromStore,
         handleToggleCoverColorBg: onToggleCoverColorBg,
         handleToggleStaticMode: onToggleStaticMode,
         handleToggleDisableHomeDynamicBackground: onToggleDisableHomeDynamicBackground,
@@ -220,6 +220,13 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         handleSetHomeLayoutStyle: onChangeHomeLayoutStyle,
         handleSetGrid3dCardStyle: onChangeGrid3dCardStyle,
     } = useSettingsUiStore(useShallow(selectSettingsUiSnapshot));
+
+    const isElectronWindow = typeof window !== 'undefined' && Boolean((window as any).electron);
+    const isIframeMode = typeof window !== 'undefined' &&
+        new URLSearchParams(window.location.search).get('mode') === 'iframe' &&
+        new URLSearchParams(window.location.search).get('from') === 'FullPlayerOverlay';
+    const enableNowPlayingStage = !isElectronWindow || enableNowPlayingStageFromStore;
+
     const resolvedToggleTransparentPlayerBackground = onToggleTransparentPlayerBackground ?? onToggleTransparentPlayerBackgroundFromStore;
     const setIsSubSettingsViewOpen = useSettingsUiStore(state => state.setIsSubSettingsViewOpen);
     const setIsUserGuideModalOpen = useSettingsUiStore(state => state.setIsUserGuideModalOpen);
@@ -965,7 +972,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             exit={{ opacity: 0 }}
             transition={shellTransition}
             data-folia-keyboard-window="true"
-            className="fixed inset-0 z-[100] flex items-center justify-center px-4 pt-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] sm:px-5 sm:pt-5 sm:pb-[calc(6.5rem+env(safe-area-inset-bottom))]"
+            className="fixed inset-0 z-100 flex items-center justify-center px-4 pt-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] sm:px-5 sm:pt-5 sm:pb-[calc(6.5rem+env(safe-area-inset-bottom))]"
             style={{ backgroundColor: overlayBackground }}
             onClick={(event) => handleBackdropClose(event, onClose)}
         >

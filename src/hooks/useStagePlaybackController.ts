@@ -2,11 +2,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Dispatch, MutableRefObject, RefObject, SetStateAction } from 'react';
 import type { MotionValue } from 'framer-motion';
 import { LyricParserFactory } from '../utils/lyrics/LyricParserFactory';
+import { autoMatchBestLyric } from '../utils/lyrics/autoMatchBestLyric';
 import { getFromCache, removeFromCache, saveToCache } from '../services/db';
 import { NowPlayingProvider } from '../services/nowPlayingProvider';
 import { findLatestActiveLineIndex, hasRenderableLyrics } from '../utils/appPlaybackHelpers';
 import { buildStageEntryKey, getStageLyricsTimelineBounds } from '../utils/appStageHelpers';
 import { isStagePlaybackSong } from '../utils/appPlaybackGuards';
+import { loadOnlineLyricsState, resolveOnlineLyrics } from '../utils/onlineLyricsState';
+import type { OnlineLyricsState } from '../types';
 import {
     buildNowPlayingContentLoadKey,
     clampNowPlayingTimeSec,
@@ -76,6 +79,7 @@ type UseStagePlaybackControllerParams = {
     setDuration: SetState<number>;
     setStatusMsg: SetState<StatusMessage | null>;
     navigateToPlayer: () => void;
+    setNowPlayingLoopMode: (mode: 'off' | 'all' | 'one') => void;
 };
 
 type LoadPlaybackOptions = {
@@ -96,6 +100,20 @@ type NowPlayingDebugInfo = {
 };
 
 const EMPTY_STAGE_ENTRY_KEY = '__empty-stage-entry__';
+
+const tryOnlineScrapingLyrics = async (title: string, artist: string, durationMs: number): Promise<LyricData | null> => {
+    try {
+        console.log('[NowPlaying][Scraper] Initiating multi-source auto-match for:', title, artist, durationMs);
+        const matchResult = await autoMatchBestLyric(title, artist, durationMs);
+        if (matchResult && !('isPureMusic' in matchResult && matchResult.isPureMusic)) {
+            console.log('[NowPlaying][Scraper] Successfully matched lyrics from source:', (matchResult as any).source);
+            return (matchResult as any).lyrics;
+        }
+    } catch (e) {
+        console.warn('[NowPlaying][Scraper] Error during autoMatchBestLyric:', e);
+    }
+    return null;
+};
 
 // Keeps Stage / Now Playing state isolated from the main player snapshot.
 export function useStagePlaybackController({
@@ -133,6 +151,7 @@ export function useStagePlaybackController({
     setDuration,
     setStatusMsg,
     navigateToPlayer,
+    setNowPlayingLoopMode,
 }: UseStagePlaybackControllerParams) {
     const [stageStatus, setStageStatus] = useState<StageStatus | null>(null);
     const [nowPlayingConnectionStatus, setNowPlayingConnectionStatus] = useState<NowPlayingConnectionStatus>('disabled');
@@ -192,9 +211,24 @@ export function useStagePlaybackController({
     const stageActiveEntryKind = stageStatus?.activeEntryKind ?? null;
     const stageLyricsSession = stageStatus?.lyricsSession ?? null;
     const stageMediaSession = stageStatus?.mediaSession ?? null;
+    // 32位哈希函数生成稳定ID
+    const hashCode = (str: string): number => {
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) {
+            const chr = str.charCodeAt(i);
+            hash = ((hash << 5) - hash) + chr;
+            hash |= 0;
+        }
+        return hash;
+    };
+
+    const isIframeMode = typeof window !== 'undefined' &&
+        new URLSearchParams(window.location.search).get('mode') === 'iframe' &&
+        new URLSearchParams(window.location.search).get('from') === 'FullPlayerOverlay';
+
     const stageSource: StageSource | null = isElectronWindow
         ? (stageStatus?.modeEnabled ? (stageStatus?.source ?? 'stage-api') : null)
-        : (enableNowPlayingStage ? 'now-playing' : null);
+        : 'now-playing';
     const isNowPlayingStageActive = activePlaybackContext === 'stage' && stageSource === 'now-playing';
     const shouldPublishNowPlayingState = isDev || isNowPlayingStageActive;
     shouldPublishNowPlayingStateRef.current = shouldPublishNowPlayingState;
@@ -293,19 +327,24 @@ export function useStagePlaybackController({
         clearPlaybackSurface();
     }, [audioRef, clearPlaybackSurface, currentSongRef]);
 
-    const buildStagePlaybackSong = useCallback((session: StageMediaSession): SongResult => ({
-        id: -Math.max(1, Math.floor(session.updatedAt || Date.now())),
-        name: session.title || 'Stage Session',
-        artists: [{ id: 0, name: session.artist || 'Stage' }],
-        album: { id: 0, name: session.album || 'Stage', picUrl: session.coverArtUrl || session.coverUrl || undefined },
-        duration: Math.max(0, Math.floor(session.durationMs || 0)),
-        al: { id: 0, name: session.album || 'Stage', picUrl: session.coverArtUrl || session.coverUrl || undefined },
-        ar: [{ id: 0, name: session.artist || 'Stage' }],
-        dt: Math.max(0, Math.floor(session.durationMs || 0)),
-        sourceType: 'cloud',
-        isStage: true,
-        stageData: session,
-    } as SongResult), []);
+    const buildStagePlaybackSong = useCallback((session: StageMediaSession): SongResult => {
+        const id = isIframeMode && session.title && session.artist
+            ? -Math.abs(hashCode(`${session.title}_${session.artist}`) || 1)
+            : -Math.max(1, Math.floor(session.updatedAt || Date.now()));
+        return {
+            id,
+            name: session.title || 'Stage Session',
+            artists: [{ id: 0, name: session.artist || 'Stage' }],
+            album: { id: 0, name: session.album || 'Stage', picUrl: session.coverArtUrl || session.coverUrl || undefined },
+            duration: Math.max(0, Math.floor(session.durationMs || 0)),
+            al: { id: 0, name: session.album || 'Stage', picUrl: session.coverArtUrl || session.coverUrl || undefined },
+            ar: [{ id: 0, name: session.artist || 'Stage' }],
+            dt: Math.max(0, Math.floor(session.durationMs || 0)),
+            sourceType: 'cloud',
+            isStage: true,
+            stageData: session,
+        } as SongResult;
+    }, [isIframeMode]);
 
     const resetStageLyricsClock = useCallback(() => {
         stageLyricsClockRef.current = {
@@ -466,6 +505,9 @@ export function useStagePlaybackController({
         paused: boolean,
         options: { onlyIfDrifted?: boolean; source: NowPlayingDebugInfo['lastQuerySource']; }
     ) => {
+        if (isIframeMode) {
+            return false;
+        }
         const requestId = nowPlayingPreciseQueryRequestIdRef.current + 1;
         nowPlayingPreciseQueryRequestIdRef.current = requestId;
         const requestStartedAt = performance.now();
@@ -515,19 +557,24 @@ export function useStagePlaybackController({
         }
     }, [applyNowPlayingPreciseAnchor, isDev, updateNowPlayingDebugInfo]);
 
-    const buildStageLyricsPlaybackSong = useCallback((session: StageLyricsSession, lyricData: LyricData): SongResult => ({
-        id: -Math.max(1, Math.floor(session.updatedAt || Date.now())),
-        name: session.title || lyricData.title || 'Stage Lyrics',
-        artists: [{ id: 0, name: session.artist || lyricData.artist || 'Stage' }],
-        album: { id: 0, name: session.album || 'Stage', picUrl: undefined },
-        duration: Math.max(0, Math.floor(getStageLyricsTimelineBounds(lyricData).endTimeSec * 1000)),
-        al: { id: 0, name: session.album || 'Stage', picUrl: undefined },
-        ar: [{ id: 0, name: session.artist || lyricData.artist || 'Stage' }],
-        dt: Math.max(0, Math.floor(getStageLyricsTimelineBounds(lyricData).endTimeSec * 1000)),
-        sourceType: 'cloud',
-        isStage: true,
-        stageData: session,
-    } as SongResult), []);
+    const buildStageLyricsPlaybackSong = useCallback((session: StageLyricsSession, lyricData: LyricData): SongResult => {
+        const id = isIframeMode && (session.title || lyricData.title) && (session.artist || lyricData.artist)
+            ? -Math.abs(hashCode(`${session.title || lyricData.title}_${session.artist || lyricData.artist}`) || 1)
+            : -Math.max(1, Math.floor(session.updatedAt || Date.now()));
+        return {
+            id,
+            name: session.title || lyricData.title || 'Stage Lyrics',
+            artists: [{ id: 0, name: session.artist || lyricData.artist || 'Stage' }],
+            album: { id: 0, name: session.album || 'Stage', picUrl: undefined },
+            duration: Math.max(0, Math.floor(getStageLyricsTimelineBounds(lyricData).endTimeSec * 1000)),
+            al: { id: 0, name: session.album || 'Stage', picUrl: undefined },
+            ar: [{ id: 0, name: session.artist || lyricData.artist || 'Stage' }],
+            dt: Math.max(0, Math.floor(getStageLyricsTimelineBounds(lyricData).endTimeSec * 1000)),
+            sourceType: 'cloud',
+            isStage: true,
+            stageData: session,
+        } as SongResult;
+    }, [isIframeMode]);
 
     const buildNowPlayingLyricsSession = useCallback((track: NowPlayingTrackSnapshot | null, payload: NowPlayingLyricPayload): StageLyricsSession | null => {
         const lyricSource = buildNowPlayingLyricSource(payload);
@@ -568,6 +615,20 @@ export function useStagePlaybackController({
                 console.warn('[Stage] Failed to parse stage lyrics', error);
             }
         }
+        if (isIframeMode) {
+            try {
+                const state = await loadOnlineLyricsState(stageSong);
+                if (state) {
+                    stageSong.onlineLyricsState = state;
+                    const resolved = resolveOnlineLyrics(state, parsedLyrics);
+                    if (resolved) {
+                        parsedLyrics = resolved;
+                    }
+                }
+            } catch (error) {
+                console.warn('[Stage] Failed to load online lyrics state:', error);
+            }
+        }
         setCurrentSong(stageSong);
         setLyrics(parsedLyrics);
         setCachedCoverUrl(session.coverArtUrl || session.coverUrl || null);
@@ -587,6 +648,7 @@ export function useStagePlaybackController({
         clearPlaybackSurface,
         currentSongRef,
         currentTime,
+        isIframeMode,
         pendingResumeTimeRef,
         resetStageLyricsClock,
         setAudioSrc,
@@ -633,6 +695,21 @@ export function useStagePlaybackController({
         const nextLineIndex = findLatestActiveLineIndex(parsedLyrics.lines, initialTime);
         const stageSong = buildStageLyricsPlaybackSong(session, parsedLyrics);
 
+        if (isIframeMode) {
+            try {
+                const state = await loadOnlineLyricsState(stageSong);
+                if (state) {
+                    stageSong.onlineLyricsState = state;
+                    const resolved = resolveOnlineLyrics(state, parsedLyrics);
+                    if (resolved) {
+                        parsedLyrics = resolved;
+                    }
+                }
+            } catch (error) {
+                console.warn('[Stage] Failed to load online lyrics state for lyrics session:', error);
+            }
+        }
+
         clearPlaybackSurface();
         shouldAutoPlayRef.current = false;
         pendingResumeTimeRef.current = null;
@@ -654,6 +731,7 @@ export function useStagePlaybackController({
         clearPlaybackSurface,
         currentSongRef,
         currentTime,
+        isIframeMode,
         pendingResumeTimeRef,
         resetStageLyricsClock,
         setAudioSrc,
@@ -700,6 +778,16 @@ export function useStagePlaybackController({
             }
         }
 
+        const hasWordTiming = parsedLyrics?.lines?.some(l => l.words && l.words.length > 0) ?? false;
+        if (!hasWordTiming && (track?.title || lyricPayload?.title)) {
+            const title = track?.title || lyricPayload?.title || '';
+            const artist = track?.artist || lyricPayload?.artist || '';
+            const scraped = await tryOnlineScrapingLyrics(title, artist, track?.durationMs ?? lyricPayload?.durationMs ?? 0);
+            if (scraped && nowPlayingContentLoadRequestIdRef.current === requestId) {
+                parsedLyrics = scraped;
+            }
+        }
+
         if (nowPlayingContentLoadRequestIdRef.current !== requestId) {
             return;
         }
@@ -710,8 +798,12 @@ export function useStagePlaybackController({
         const fallbackAlbum = track?.album || '';
         const fallbackCoverUrl = track?.coverUrl || null;
         const resolvedDurationSec = durationSec || (renderableLyrics ? getStageLyricsTimelineBounds(renderableLyrics).endTimeSec : 0);
+        const fallbackSongId = isIframeMode && (fallbackTitle || fallbackArtist)
+            ? -Math.abs(hashCode(`${fallbackTitle}_${fallbackArtist}`) || 1)
+            : -Math.max(1, Math.floor(Date.now()));
+
         const fallbackSong: SongResult | null = (track || lyricPayload) ? ({
-            id: -Math.max(1, Math.floor(Date.now())),
+            id: fallbackSongId,
             name: fallbackTitle,
             artists: [{ id: 0, name: fallbackArtist }],
             album: { id: 0, name: fallbackAlbum || 'Now Playing', picUrl: fallbackCoverUrl || undefined },
@@ -723,6 +815,27 @@ export function useStagePlaybackController({
             isStage: true,
         } as SongResult) : null;
 
+        let finalLyrics = renderableLyrics;
+        let onlineState: OnlineLyricsState | undefined = undefined;
+        if (isIframeMode && fallbackSong) {
+            try {
+                const state = await loadOnlineLyricsState(fallbackSong);
+                if (state) {
+                    onlineState = state;
+                    const resolved = resolveOnlineLyrics(state, renderableLyrics);
+                    if (resolved) {
+                        finalLyrics = resolved;
+                    }
+                }
+            } catch (error) {
+                console.warn('[NowPlaying] Failed to load online lyrics state:', error);
+            }
+        }
+
+        if (onlineState && fallbackSong) {
+            fallbackSong.onlineLyricsState = onlineState;
+        }
+
         shouldAutoPlayRef.current = false;
         pendingResumeTimeRef.current = null;
         currentSongRef.current = fallbackSong?.id ?? null;
@@ -732,14 +845,14 @@ export function useStagePlaybackController({
         setPlayQueue([]);
         setIsFmMode(false);
         setIsLyricsLoading(false);
-        setLyrics(renderableLyrics);
+        setLyrics(finalLyrics);
         setDuration(resolvedDurationSec);
 
         const displayTimeSec = clampNowPlayingTimeSec(getNowPlayingDisplayTime(), resolvedDurationSec);
         if (isNowPlayingStageActive) {
-            syncNowPlayingDisplaySurface(displayTimeSec, renderableLyrics);
+            syncNowPlayingDisplaySurface(displayTimeSec, finalLyrics);
         } else {
-            const nextLineIndex = renderableLyrics ? findLatestActiveLineIndex(renderableLyrics.lines, displayTimeSec) : -1;
+            const nextLineIndex = finalLyrics ? findLatestActiveLineIndex(finalLyrics.lines, displayTimeSec) : -1;
             if (nextLineIndex !== currentLineIndexRef.current) {
                 currentLineIndexRef.current = nextLineIndex;
                 setCurrentLineIndex(nextLineIndex);
@@ -750,6 +863,7 @@ export function useStagePlaybackController({
         currentSongRef,
         getNowPlayingDisplayTime,
         isDev,
+        isIframeMode,
         isNowPlayingStageActive,
         pendingResumeTimeRef,
         setAudioSrc,
@@ -1097,6 +1211,16 @@ export function useStagePlaybackController({
                     setNowPlayingProgressQuality(quality);
                 }
             },
+            onQueue: (queue) => {
+                if (shouldPublishNowPlayingStateRef.current) {
+                    setPlayQueue(queue);
+                }
+            },
+            onLoopMode: (loopMode) => {
+                if (shouldPublishNowPlayingStateRef.current) {
+                    setNowPlayingLoopMode(loopMode);
+                }
+            },
         });
 
         nowPlayingProviderRef.current = provider;
@@ -1203,6 +1327,12 @@ export function useStagePlaybackController({
         nowPlayingTrack,
         stageSource,
     ]);
+
+    useEffect(() => {
+        if (activePlaybackContext !== 'stage') {
+            nowPlayingContentLoadKeyRef.current = null;
+        }
+    }, [activePlaybackContext]);
 
     useEffect(() => {
         if (stageSource !== 'now-playing') {

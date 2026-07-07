@@ -102,7 +102,7 @@ const IntegrationSettingsSubview: React.FC<IntegrationSettingsSubviewProps> = ({
         toggleOffBackgroundClass,
     } = chrome;
     const {
-        enableNowPlayingStage,
+        enableNowPlayingStage: enableNowPlayingStageFromStore,
         nowPlayingConnectionStatus,
         obsBrowserSourceStatus,
         onCopyText,
@@ -119,6 +119,11 @@ const IntegrationSettingsSubview: React.FC<IntegrationSettingsSubviewProps> = ({
         stageSource,
         stageStatus,
     } = stage;
+
+    const isIframeMode = typeof window !== 'undefined' &&
+        new URLSearchParams(window.location.search).get('mode') === 'iframe' &&
+        new URLSearchParams(window.location.search).get('from') === 'FullPlayerOverlay';
+    const enableNowPlayingStage = !isElectron || enableNowPlayingStageFromStore;
     const {
         navidromeConfigured,
         navidromeEnabled,
@@ -429,8 +434,9 @@ const IntegrationSettingsSubview: React.FC<IntegrationSettingsSubviewProps> = ({
                                 </div>
                             </div>
                             <button
-                                onClick={() => void onToggleNowPlayingStage?.(!enableNowPlayingStage)}
-                                className={`w-12 h-6 rounded-full p-1 transition-colors ${!enableNowPlayingStage ? toggleOffBackgroundClass : ''}`}
+                                onClick={() => isElectron && void onToggleNowPlayingStage?.(!enableNowPlayingStage)}
+                                disabled={!isElectron}
+                                className={`w-12 h-6 rounded-full p-1 transition-colors ${!isElectron ? 'opacity-50 cursor-not-allowed' : ''} ${!enableNowPlayingStage ? toggleOffBackgroundClass : ''}`}
                                 style={{ backgroundColor: enableNowPlayingStage ? theme?.secondaryColor || 'rgba(114, 119, 134, 1)' : undefined }}
                             >
                                 <div className={`w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${enableNowPlayingStage ? 'translate-x-6' : 'translate-x-0'}`} />

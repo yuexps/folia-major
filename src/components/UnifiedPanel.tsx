@@ -231,10 +231,15 @@ const UnifiedPanel: React.FC<UnifiedPanelProps> = ({
     const [showGuideLine, setShowGuideLine] = React.useState(false);
     const [isDragging, setIsDragging] = React.useState(false);
 
+    const isIframeMode = typeof window !== 'undefined' &&
+        new URLSearchParams(window.location.search).get('mode') === 'iframe' &&
+        new URLSearchParams(window.location.search).get('from') === 'FullPlayerOverlay';
+
     const isStage = isStageContext || Boolean(currentSong && (currentSong as any).isStage === true);
     const isNavidrome = currentSong && (currentSong as any).isNavidrome === true;
     const isLocal = currentSong && !isNavidrome && (((currentSong as any).isLocal === true) || Boolean((currentSong as any).localData));
     const isNetease = Boolean(currentSong && !isLocal && !isNavidrome && !isStage);
+    const showOnlineLyricsTab = isNetease || (isStage && isIframeMode);
     const canCreateLocalPlaylist = isLocal;
     const canCreateNavidromePlaylist = isNavidrome;
     const canAddCurrentSongToPlaylist =
@@ -316,7 +321,7 @@ const UnifiedPanel: React.FC<UnifiedPanelProps> = ({
         tabs.splice(1, 0, { id: 'local' as PanelTab, label: t('localMusic.folder'), icon: FileAudio });
     } else if (isNavidrome) {
         tabs.splice(1, 0, { id: 'navi' as PanelTab, label: 'Navidrome', icon: Cloud });
-    } else if (isNetease) {
+    } else if (showOnlineLyricsTab) {
         tabs.splice(1, 0, { id: 'onlineLyrics' as PanelTab, label: t('localMusic.lyrics'), icon: FileText });
     }
 
@@ -878,7 +883,7 @@ const UnifiedPanel: React.FC<UnifiedPanelProps> = ({
                                             isDaylight={isDaylight}
                                         />
                                     )}
-                                    {currentTab === 'onlineLyrics' && isNetease && currentSong && (
+                                    {currentTab === 'onlineLyrics' && showOnlineLyricsTab && currentSong && (
                                         <OnlineLyricsTab
                                             onlineLyricsState={onlineLyricsState}
                                             onImportLyrics={onImportOnlineLyrics}

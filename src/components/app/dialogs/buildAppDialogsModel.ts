@@ -94,7 +94,7 @@ export const buildAppDialogsModel = ({
             isDaylight,
         }
         : null,
-    onlineLyricMatchDialog: showOnlineLyricMatchModal && currentSong && !isLocalPlaybackSong(currentSong) && !isNavidromePlaybackSong(currentSong) && !isStagePlaybackSong(currentSong)
+    onlineLyricMatchDialog: showOnlineLyricMatchModal && currentSong && !isLocalPlaybackSong(currentSong) && !isNavidromePlaybackSong(currentSong) && (!isStagePlaybackSong(currentSong) || (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('mode') === 'iframe' && new URLSearchParams(window.location.search).get('from') === 'FullPlayerOverlay'))
         ? {
             song: currentSong,
             onClose: () => setShowOnlineLyricMatchModal(false),

@@ -106,7 +106,7 @@ function devLyricProxyPlugin() {
           const response = await fetch(targetUrl.toString(), {
             method: req.method,
             headers,
-            body: hasBody ? await readDevRequestBody(req) : undefined,
+            body: hasBody ? new Uint8Array(await readDevRequestBody(req)) : undefined,
           });
 
           setLyricProxyCorsHeaders(res);
@@ -185,7 +185,7 @@ export default async function viteConfig({ mode }: ConfigEnv): Promise<UserConfi
   const appVersionLabel = process.env.APP_VERSION_LABEL?.trim() || 'folia-major';
 
   return {
-    base: process.env.ELECTRON === 'true' ? './' : '/',
+    base: process.env.BUILD_BASE || (process.env.ELECTRON === 'true' ? './' : '/'),
     worker: {
       format: 'es'
     },

@@ -40,7 +40,6 @@ async function requestAmllDb(platform: AmllDbPlatform, musicId: number | string)
     }
 
     return fetch(requestUrl, {
-        credentials: 'omit',
         signal: AbortSignal.timeout(AMLL_DB_FETCH_TIMEOUT_MS),
     });
 }

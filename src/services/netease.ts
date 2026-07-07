@@ -22,6 +22,15 @@ const isElectronRuntime = () =>
   Boolean(getElectronBridge() && typeof getElectronBridge()?.getNeteasePort === 'function');
 
 const getConfiguredApiBase = () => {
+  if (typeof window !== 'undefined' && (window as any).foliaNeteaseApiBase) {
+    return (window as any).foliaNeteaseApiBase;
+  }
+  const urlParams = (typeof window !== 'undefined' && window.location) ? new URLSearchParams(window.location.search) : null;
+  const urlNeteaseApi = urlParams?.get('netease_api');
+  if (urlNeteaseApi) {
+    return urlNeteaseApi;
+  }
+
   const viteEnv = typeof import.meta !== 'undefined' ? (import.meta as any).env : undefined;
   if (viteEnv && typeof viteEnv.VITE_NETEASE_API_BASE === 'string' && viteEnv.VITE_NETEASE_API_BASE) {
     return viteEnv.VITE_NETEASE_API_BASE;

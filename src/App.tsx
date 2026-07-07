@@ -101,6 +101,10 @@ export default function App() {
     const { t } = useTranslation();
     const isDev = import.meta.env.DEV;
     const isElectronWindow = Boolean((window as typeof window & { electron?: unknown; }).electron);
+    const isIframeMode = typeof window !== 'undefined' &&
+        new URLSearchParams(window.location.search).get('mode') === 'iframe' &&
+        new URLSearchParams(window.location.search).get('from') === 'FullPlayerOverlay';
+
     const [isTitlebarRevealed, setIsTitlebarRevealed] = useState(false);
     const [showTransparentWindowBorder, setShowTransparentWindowBorder] = useState(false);
     const [isMainWindowClickThroughEnabled, setIsMainWindowClickThroughEnabled] = useState(false);
@@ -112,7 +116,7 @@ export default function App() {
     const [lyrics, setLyricsState] = useState<LyricData | null>(null);
     const [lyricTimelineOffsetMs, setLyricTimelineOffsetMs] = useState(0);
     const [cachedCoverUrl, setCachedCoverUrl] = useState<string | null>(null);
-    const [activePlaybackContext, setActivePlaybackContext] = useState<PlaybackContext>('main');
+    const [activePlaybackContext, setActivePlaybackContext] = useState<PlaybackContext>(isIframeMode ? 'stage' : 'main');
 
     // Queue
     const [playQueue, setPlayQueue] = useState<SongResult[]>([]);
@@ -401,7 +405,8 @@ export default function App() {
         setLyricTimelineOffsetMs(0);
     }, [currentSong?.id]);
 
-    const effectiveLoopMode: StageLoopMode = loopMode;
+    const [nowPlayingLoopMode, setNowPlayingLoopMode] = useState<'off' | 'all' | 'one'>('all');
+    let effectiveLoopMode: StageLoopMode = loopMode;
 
     const getTargetPlaybackVolume = useCallback(() => (isMuted ? 0 : volume), [isMuted, volume]);
 
@@ -722,6 +727,12 @@ export default function App() {
         popOverlay,
     } = useAppNavigation();
 
+    useEffect(() => {
+        if (isIframeMode && currentView !== 'player') {
+            navigateToPlayer();
+        }
+    }, [currentView, isIframeMode, navigateToPlayer]);
+
     // Auto-close the player panel when leaving the player view
     useEffect(() => {
         if (currentView !== 'player' && isPanelOpen) {
@@ -829,7 +840,10 @@ export default function App() {
         setDuration,
         setStatusMsg,
         navigateToPlayer,
+        setNowPlayingLoopMode,
     });
+
+    effectiveLoopMode = (isIframeMode && stageSource === 'now-playing') ? nowPlayingLoopMode : loopMode;
 
     const {
         restoreStatus: windowPlaybackHandoffRestoreStatus,
@@ -1039,8 +1053,8 @@ export default function App() {
         handleUnavailableReplacementConfirm,
         handleSearchResultArtistSelect,
         handleSearchResultAlbumSelect,
-        handleNextTrack,
-        handlePrevTrack,
+        handleNextTrack: handleNextTrackOriginal,
+        handlePrevTrack: handlePrevTrackOriginal,
         skipAfterPlaybackFailure,
         handleStageExternalPlayRequest,
         shuffleQueue,
@@ -1104,6 +1118,24 @@ export default function App() {
         currentOnlineAudioUrlFetchedAtRef,
         lastAudioRecoverySourceRef,
     });
+
+    const handleNextTrack = useCallback((options?: any) => {
+        console.log('[Folia][iframe] handleNextTrack called, isIframeMode:', isIframeMode);
+        if (isIframeMode) {
+            window.parent.postMessage({ type: 'folia-next' }, '*');
+            return;
+        }
+        return handleNextTrackOriginal(options);
+    }, [handleNextTrackOriginal, isIframeMode]);
+
+    const handlePrevTrack = useCallback(() => {
+        console.log('[Folia][iframe] handlePrevTrack called, isIframeMode:', isIframeMode);
+        if (isIframeMode) {
+            window.parent.postMessage({ type: 'folia-prev' }, '*');
+            return;
+        }
+        return handlePrevTrackOriginal();
+    }, [handlePrevTrackOriginal, isIframeMode]);
 
     usePlaybackUiEffects({
         statusMsg,
@@ -1311,8 +1343,8 @@ export default function App() {
     });
 
     const {
-        togglePlay,
-        toggleLoop,
+        togglePlay: togglePlayOriginal,
+        toggleLoop: toggleLoopOriginal,
         handleChangeReplayGainMode,
         handleContainerClick,
         handleFmTrash,
@@ -1323,7 +1355,7 @@ export default function App() {
         audioSrc,
         activePlaybackContext,
         stageActiveEntryKind,
-        isNowPlayingStageActive,
+        isNowPlayingStageActive: isNowPlayingStageActive && !isIframeMode,
         isPanelOpen,
         isFmMode,
         playerState,
@@ -1343,6 +1375,24 @@ export default function App() {
         resumePlayback,
         syncStageLyricsClock,
     });
+
+    const togglePlay = useCallback((event?: any) => {
+        console.log('[Folia][iframe] togglePlay called, isIframeMode:', isIframeMode);
+        if (isIframeMode) {
+            window.parent.postMessage({ type: 'folia-toggle-play' }, '*');
+            return;
+        }
+        return togglePlayOriginal(event);
+    }, [togglePlayOriginal, isIframeMode]);
+
+    const toggleLoop = useCallback(() => {
+        console.log('[Folia][iframe] toggleLoop called, isIframeMode:', isIframeMode);
+        if (isIframeMode) {
+            window.parent.postMessage({ type: 'folia-toggle-loop' }, '*');
+            return;
+        }
+        return toggleLoopOriginal();
+    }, [toggleLoopOriginal, isIframeMode]);
 
     const usesCustomWindowChrome = isElectronWindow;
     const isPlayerPageTransparent = transparentPlayerBackground || enablePlayerPageNativeBlur;
@@ -1380,7 +1430,7 @@ export default function App() {
         theme,
         visualizerMode,
     ]);
-    const isNowPlayingControlDisabled = isNowPlayingStageActive;
+    const isNowPlayingControlDisabled = isNowPlayingStageActive && !isIframeMode;
 
     useEffect(() => {
         localStorage.setItem(PLAYER_CHROME_HIDDEN_STORAGE_KEY, String(isPlayerChromeHidden));
@@ -1551,6 +1601,7 @@ export default function App() {
         stageActiveEntryKind,
         audioSrc,
         duration,
+        isIframeMode,
     }), [
         activePlaybackContext,
         audioSrc,
@@ -1562,6 +1613,7 @@ export default function App() {
         hidePlayerTranslationSubtitle,
         isNowPlayingControlDisabled,
         stageActiveEntryKind,
+        isIframeMode,
     ]);
     const isSettingsModalOpen = settingsModalState.isOpen;
     const {
@@ -1834,6 +1886,10 @@ export default function App() {
         generateAITheme,
     });
     const seekMainAudio = useCallback((time: number) => {
+        if (isIframeMode) {
+            window.parent.postMessage({ type: 'folia-seek', data: { positionMs: Math.round(time * 1000) } }, '*');
+            return;
+        }
         if (audioRef.current) {
             audioRef.current.currentTime = time;
             if (audioRef.current.paused) {
@@ -1842,7 +1898,7 @@ export default function App() {
             }
             void publishStagePlayerPlaybackUpdate();
         }
-    }, [publishStagePlayerPlaybackUpdate]);
+    }, [isIframeMode, publishStagePlayerPlaybackUpdate]);
 
     const handleMonetLyricLineSeek = useCallback((lyricTimeSec: number) => {
         if (isNowPlayingControlDisabled) {
@@ -1850,6 +1906,10 @@ export default function App() {
         }
 
         const playbackTime = Math.max(0, lyricTimeSec + currentTime.get() - lyricCurrentTime.get());
+        if (isIframeMode) {
+            window.parent.postMessage({ type: 'folia-seek', data: { positionMs: Math.round(playbackTime * 1000) } }, '*');
+            return;
+        }
         if (activePlaybackContext === 'stage' && stageActiveEntryKind === 'lyrics' && !audioSrc) {
             syncStageLyricsClock(playbackTime, duration, playerState, stageLyricsClockRef.current.startTimeSec);
             currentTime.set(playbackTime);
@@ -2398,6 +2458,16 @@ export default function App() {
         handlePlayerPanelArtistSelect,
         navigateDirectHome,
     ]);
+    const playSongOriginal = playSong;
+    const playSongWrapper = useCallback(async (song: SongResult, queue?: SongResult[], isFmCall?: boolean) => {
+        console.log('[Folia][iframe] playSong called, name:', song.name, 'isIframeMode:', isIframeMode);
+        if (isIframeMode && stageSource === 'now-playing') {
+            window.parent.postMessage({ type: 'folia-play-song', data: { id: song.id } }, '*');
+            return;
+        }
+        return playSongOriginal(song, queue, isFmCall);
+    }, [playSongOriginal, isIframeMode, stageSource]);
+
     const appOverlaysModel = useMemo(() => buildAppOverlaysModel({
         currentView,
         isOverlayVisible,
@@ -2413,7 +2483,7 @@ export default function App() {
         handleSearchResultArtistSelect,
         handleSearchResultAlbumSelect,
         popOverlay,
-        playSong,
+        playSong: playSongWrapper,
         playOnlineQueueFromStart,
         addNeteaseSongsToQueue,
         addNeteaseSongToQueue,
@@ -2481,7 +2551,7 @@ export default function App() {
         playerState,
         playlists,
         playOnlineQueueFromStart,
-        playSong,
+        playSongWrapper,
         popOverlay,
         publishStagePlayerPlaybackUpdate,
         refreshUserData,
@@ -2901,6 +2971,16 @@ export default function App() {
             )}
 
             <AppOverlays model={appOverlaysModel} />
+
+            {isIframeMode && (
+                <button
+                    onClick={() => window.parent.postMessage({ type: 'folia-exit' }, '*')}
+                    className="fixed top-4 right-4 z-50 px-4 py-2 bg-black/40 hover:bg-black/60 active:scale-95 text-white/80 hover:text-white border border-white/10 rounded-full text-xs font-semibold backdrop-blur-md transition-all cursor-pointer shadow-lg"
+                    style={{ fontFamily: 'var(--font-sans)' }}
+                >
+                    经典模式
+                </button>
+            )}
 
             {currentView === 'player' && !showLyricMatchModal && (
                 <PlayerPanel model={playerPanelModel} />
