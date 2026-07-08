@@ -104,6 +104,24 @@ export default function App() {
     const fromFullPlayerOverlay = typeof window !== 'undefined' &&
         new URLSearchParams(window.location.search).get('from') === 'FullPlayerOverlay';
 
+    // 声明辅助函数，在 React 首帧渲染时直接从同源宿主同步读取当前的歌曲和播放列表，消除 postMessage 带来的 0.x 秒时序闪现
+    const getParentFoliaWindowData = () => {
+        try {
+            if (typeof window !== 'undefined' && window.parent && window.parent !== window) {
+                const parentWin = window.parent as any;
+                return {
+                    track: parentWin.currentFoliaTrack || null,
+                    lyric: parentWin.currentFoliaLyric || null,
+                    state: parentWin.currentFoliaState || null,
+                    queue: parentWin.currentFoliaQueue || null
+                };
+            }
+        } catch (e) {
+            // 跨域防护
+        }
+        return { track: null, lyric: null, state: null, queue: null };
+    };
+
     const [isTitlebarRevealed, setIsTitlebarRevealed] = useState(false);
     const [showTransparentWindowBorder, setShowTransparentWindowBorder] = useState(false);
     const [isMainWindowClickThroughEnabled, setIsMainWindowClickThroughEnabled] = useState(false);
@@ -111,14 +129,51 @@ export default function App() {
 
     // Player Data
     const [audioSrc, setAudioSrc] = useState<string | null>(null);
-    const [currentSong, setCurrentSong] = useState<SongResult | null>(null);
+    const [currentSong, setCurrentSong] = useState<SongResult | null>(() => {
+        const parentData = getParentFoliaWindowData();
+        if (parentData.track) {
+            const raw = parentData.track;
+            const ms = (raw.duration || 0) * 1000;
+            return {
+                id: raw.id,
+                name: raw.title || '',
+                ar: [{ id: 0, name: raw.author || '' }],
+                artists: [{ id: 0, name: raw.author || '' }],
+                al: { id: 0, name: raw.album || '', picUrl: raw.cover || undefined },
+                album: { id: 0, name: raw.album || '', picUrl: raw.cover || undefined },
+                duration: ms,
+                dt: ms,
+                isStage: true
+            } as any;
+        }
+        return null;
+    });
     const [lyrics, setLyricsState] = useState<LyricData | null>(null);
     const [lyricTimelineOffsetMs, setLyricTimelineOffsetMs] = useState(0);
-    const [cachedCoverUrl, setCachedCoverUrl] = useState<string | null>(null);
+    const [cachedCoverUrl, setCachedCoverUrl] = useState<string | null>(() => {
+        const parentData = getParentFoliaWindowData();
+        return parentData.track ? parentData.track.cover || null : null;
+    });
     const [activePlaybackContext, setActivePlaybackContext] = useState<PlaybackContext>(fromFullPlayerOverlay ? 'stage' : 'main');
 
     // Queue
-    const [playQueue, setPlayQueue] = useState<SongResult[]>([]);
+    const [playQueue, setPlayQueue] = useState<SongResult[]>(() => {
+        const parentData = getParentFoliaWindowData();
+        if (parentData.queue && Array.isArray(parentData.queue.queue)) {
+            return parentData.queue.queue.map((raw: any) => ({
+                id: raw.id,
+                name: raw.title || '',
+                ar: [{ id: 0, name: raw.artist || '' }],
+                artists: [{ id: 0, name: raw.artist || '' }],
+                al: { id: 0, name: raw.album || '', picUrl: raw.cover || undefined },
+                album: { id: 0, name: raw.album || '', picUrl: raw.cover || undefined },
+                duration: raw.durationMs || 0,
+                dt: raw.durationMs || 0,
+                isStage: true
+            } as any));
+        }
+        return [];
+    });
 
     // UI State
     const [statusMsg, setStatusMsg] = useState<StatusMessage | null>(null);
@@ -211,12 +266,24 @@ export default function App() {
     }, [settingsModalState.isOpen, navidromeEnabled, loadNavidromeFavorites]);
 
     // Player State
-    const [playerState, setPlayerState] = useState<PlayerState>(PlayerState.IDLE);
-    const currentTime = useMotionValue(0);
+    const [playerState, setPlayerState] = useState<PlayerState>(() => {
+        const parentData = getParentFoliaWindowData();
+        if (parentData.state) {
+            return parentData.state.isPaused ? PlayerState.PAUSED : PlayerState.PLAYING;
+        }
+        return PlayerState.IDLE;
+    });
+    const currentTime = useMotionValue((() => {
+        const parentData = getParentFoliaWindowData();
+        return parentData.state ? (parentData.state.progressMs || 0) / 1000 : 0;
+    })());
     useEffect(() => {
         (window as any).__folia_current_time = currentTime;
     }, [currentTime]);
-    const [duration, setDuration] = useState(0);
+    const [duration, setDuration] = useState(() => {
+        const parentData = getParentFoliaWindowData();
+        return parentData.track ? parentData.track.duration || 0 : 0;
+    });
     const [currentLineIndex, setCurrentLineIndex] = useState(-1);
     const [isFmMode, setIsFmMode] = useState(false);
 
@@ -408,7 +475,13 @@ export default function App() {
         setLyricTimelineOffsetMs(0);
     }, [currentSong?.id]);
 
-    const [nowPlayingLoopMode, setNowPlayingLoopMode] = useState<'off' | 'all' | 'one'>('all');
+    const [nowPlayingLoopMode, setNowPlayingLoopMode] = useState<'off' | 'all' | 'one'>(() => {
+        const parentData = getParentFoliaWindowData();
+        if (parentData.state && parentData.state.loopMode) {
+            return parentData.state.loopMode;
+        }
+        return 'all';
+    });
     let effectiveLoopMode: StageLoopMode = loopMode;
 
     const getTargetPlaybackVolume = useCallback(() => (isMuted ? 0 : volume), [isMuted, volume]);

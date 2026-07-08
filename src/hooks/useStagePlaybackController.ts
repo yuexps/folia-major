@@ -864,7 +864,9 @@ export function useStagePlaybackController({
         setCurrentSong(fallbackSong);
         setCachedCoverUrl(fallbackCoverUrl);
         setAudioSrc(null);
-        setPlayQueue([]);
+        if (!fromFullPlayerOverlay) {
+            setPlayQueue([]);
+        }
         setIsFmMode(false);
         setIsLyricsLoading(false);
         setLyrics(finalLyrics);
