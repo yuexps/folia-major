@@ -400,6 +400,10 @@ export const Grid3DSlider: React.FC<Grid3DSliderProps> = ({
         if (!isInteractive) return;
 
         const handleKeyDown = (event: KeyboardEvent) => {
+            const fromFullPlayerOverlay = typeof window !== 'undefined' &&
+                new URLSearchParams(window.location.search).get('from') === 'FullPlayerOverlay';
+            if (fromFullPlayerOverlay) return;
+
             if (
                 event.target instanceof HTMLInputElement ||
                 event.target instanceof HTMLTextAreaElement ||

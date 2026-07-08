@@ -10,6 +10,7 @@ type NowPlayingTrackMessage = {
     cover?: string;
     duration?: number;
     id?: string | number;
+    liked?: boolean;
 };
 
 type NowPlayingPlayerStateMessage = {
@@ -61,6 +62,7 @@ const areTracksEqual = (
     && left?.album === right?.album
     && left?.coverUrl === right?.coverUrl
     && left?.durationMs === right?.durationMs
+    && left?.liked === right?.liked
 );
 
 const areLyricsEqual = (
@@ -113,6 +115,7 @@ type NowPlayingProviderCallbacks = {
     onProgress?: (update: NowPlayingProgressUpdate) => void;
     onQueue?: (queue: any[]) => void;
     onLoopMode?: (loopMode: 'all' | 'one' | 'off') => void;
+    onVolume?: (volume: number) => void;
 };
 
 const clampProgressMs = (value: unknown): number => {
@@ -186,6 +189,7 @@ export const normalizeNowPlayingTrack = (raw: unknown): NowPlayingTrackSnapshot 
     const durationMs = normalizeDurationMs(track.duration);
     const idValue = track.id;
     const id = idValue === undefined || idValue === null ? null : String(idValue);
+    const liked = typeof track.liked === 'boolean' ? track.liked : false;
 
     if (!title && !artist && !album && !coverUrl && durationMs === 0 && !id) {
         return null;
@@ -198,6 +202,7 @@ export const normalizeNowPlayingTrack = (raw: unknown): NowPlayingTrackSnapshot 
         album: album || '',
         coverUrl: coverUrl || null,
         durationMs: durationMs || null,
+        liked,
     };
 };
 
@@ -291,8 +296,9 @@ export class NowPlayingProvider {
             const isPaused = Boolean(data?.isPaused);
             const progressMs = clampProgressMs(data?.progressMs);
             const loopMode = data?.loopMode as 'all' | 'one' | 'off' | undefined;
+            const volume = typeof data?.volume === 'number' ? data.volume : undefined;
             if (this.debug) {
-                console.log('[NowPlaying][iframe] Received state:', { isPaused, progressMs, loopMode });
+                console.log('[NowPlaying][iframe] Received state:', { isPaused, progressMs, loopMode, volume });
             }
             this.snapshot = {
                 ...this.snapshot,
@@ -303,6 +309,9 @@ export class NowPlayingProvider {
             this.callbacks.onProgress?.({ progressMs, isReplay: false, quality: 'precise' });
             if (loopMode) {
                 this.callbacks.onLoopMode?.(loopMode);
+            }
+            if (volume !== undefined) {
+                this.callbacks.onVolume?.(volume);
             }
         } else if (type === '2fmusic-progress') {
             const progressMs = clampProgressMs(data?.progressMs);
@@ -320,16 +329,38 @@ export class NowPlayingProvider {
         }
     };
 
+    private forwardToOpener = (event: MessageEvent) => {
+        const { type } = event.data || {};
+        if (type && type.startsWith('folia-')) {
+            try {
+                window.opener?.postMessage(event.data, '*');
+            } catch (e) {
+                // Ignore cross-origin or closed opener window
+            }
+        }
+    };
+
     start() {
         this.stopped = false;
         this.clearReconnectTimer();
 
         const isEmbedded = typeof window !== 'undefined' && window.self !== window.top;
+        const hasOpener = typeof window !== 'undefined' && !!window.opener;
 
-        if (isEmbedded) {
+        if (isEmbedded || hasOpener) {
             this.updateConnectionStatus('connected');
             window.addEventListener('message', this.handlePostMessage);
-            window.parent.postMessage({ type: 'folia-ready' }, '*');
+
+            if (isEmbedded) {
+                window.parent.postMessage({ type: 'folia-ready' }, '*');
+            } else {
+                window.addEventListener('message', this.forwardToOpener);
+                try {
+                    window.opener.postMessage({ type: 'folia-ready' }, '*');
+                } catch (e) {
+                    // Ignore cross-origin or closed opener window
+                }
+            }
             return;
         }
 
@@ -341,9 +372,13 @@ export class NowPlayingProvider {
         this.clearReconnectTimer();
 
         const isEmbedded = typeof window !== 'undefined' && window.self !== window.top;
+        const hasOpener = typeof window !== 'undefined' && !!window.opener;
 
-        if (isEmbedded) {
+        if (isEmbedded || hasOpener) {
             window.removeEventListener('message', this.handlePostMessage);
+            if (hasOpener) {
+                window.removeEventListener('message', this.forwardToOpener);
+            }
         }
 
         if (this.socket) {

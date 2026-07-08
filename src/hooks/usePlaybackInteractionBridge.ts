@@ -71,6 +71,9 @@ export function usePlaybackInteractionBridge({
     resumePlayback,
     syncStageLyricsClock,
 }: UsePlaybackInteractionBridgeParams) {
+    const fromFullPlayerOverlay = typeof window !== 'undefined' &&
+        new URLSearchParams(window.location.search).get('from') === 'FullPlayerOverlay';
+
     const togglePlay = useCallback((event?: React.MouseEvent | KeyboardEvent) => {
         event?.stopPropagation();
 
@@ -139,6 +142,12 @@ export function usePlaybackInteractionBridge({
                 || (event.target instanceof HTMLElement && event.target.isContentEditable)
             ) {
                 return;
+            }
+
+            if (fromFullPlayerOverlay) {
+                if (event.code !== 'Space' && event.code !== 'ArrowLeft' && event.code !== 'ArrowRight') {
+                    return;
+                }
             }
 
             const hasBlockingWindow = () => Boolean(

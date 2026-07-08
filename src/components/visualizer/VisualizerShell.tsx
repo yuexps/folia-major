@@ -79,6 +79,8 @@ const VisualizerShell = forwardRef<HTMLDivElement, VisualizerShellProps>(({
     className = '',
 }, ref) => {
     const { t } = useTranslation();
+    const fromFullPlayerOverlay = typeof window !== 'undefined' &&
+        new URLSearchParams(window.location.search).get('from') === 'FullPlayerOverlay';
     const [showBackButton, setShowBackButton] = useState(false);
     const resolvedCoverUrl = sharedProps?.coverUrl ?? coverUrl;
     const resolvedIsDaylight = sharedProps?.isDaylight ?? false;
@@ -136,7 +138,8 @@ const VisualizerShell = forwardRef<HTMLDivElement, VisualizerShellProps>(({
             {resolvedOnBack && (
                 <motion.button
                     type="button"
-                    aria-label={t('ui.backToHome')}
+                    aria-label={fromFullPlayerOverlay ? '返回经典模式' : t('ui.backToHome')}
+                    title={fromFullPlayerOverlay ? '返回经典模式' : t('ui.backToHome')}
                     initial={false}
                     animate={{
                         opacity: showBackButton ? 1 : 0,

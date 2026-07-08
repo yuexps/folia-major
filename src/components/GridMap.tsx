@@ -106,16 +106,16 @@ const MapCard = React.memo<{
                 {/* Bottom Polaroid Frame Label Details */}
                 <div className="w-full flex-1 flex flex-col justify-between pt-3 text-left min-w-0">
                     <div className="space-y-1 mb-2">
-                        <div className="text-xs font-bold tracking-tight opacity-90 max-w-full line-clamp-2 whitespace-normal break-words">
+                        <div className="text-xs font-bold tracking-tight opacity-90 max-w-full line-clamp-2 whitespace-normal wrap-break-word">
                             {item.name}
                         </div>
                         {item.description && (
-                            <div className="text-[10px] opacity-55 max-w-full font-medium line-clamp-1 whitespace-normal break-words">
+                            <div className="text-[10px] opacity-55 max-w-full font-medium line-clamp-1 whitespace-normal wrap-break-word">
                                 {item.description}
                             </div>
                         )}
                         {compactDescription(item.summary) && (
-                            <div className="text-[10px] leading-snug opacity-45 max-w-full font-medium line-clamp-2 whitespace-normal break-words">
+                            <div className="text-[10px] leading-snug opacity-45 max-w-full font-medium line-clamp-2 whitespace-normal wrap-break-word">
                                 {compactDescription(item.summary)}
                             </div>
                         )}
@@ -176,6 +176,10 @@ export const GridMap: React.FC<GridMapProps> = ({
 
     useEffect(() => {
         const handleSearchTyping = (event: KeyboardEvent) => {
+            const fromFullPlayerOverlay = typeof window !== 'undefined' &&
+                new URLSearchParams(window.location.search).get('from') === 'FullPlayerOverlay';
+            if (fromFullPlayerOverlay) return;
+
             if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
                 if (event.key === 'Escape' && showSearchPanel) {
                     setShowSearchPanel(false);
@@ -612,6 +616,10 @@ export const GridMap: React.FC<GridMapProps> = ({
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
+            const fromFullPlayerOverlay = typeof window !== 'undefined' &&
+                new URLSearchParams(window.location.search).get('from') === 'FullPlayerOverlay';
+            if (fromFullPlayerOverlay) return;
+
             if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
 
             if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
@@ -658,7 +666,7 @@ export const GridMap: React.FC<GridMapProps> = ({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[110] overflow-hidden select-none"
+            className="fixed inset-0 z-110 overflow-hidden select-none"
             style={{
                 backgroundColor: isDaylight ? 'rgba(250, 249, 246, 0.95)' : 'rgba(9, 9, 11, 0.95)',
                 color: 'var(--text-primary)',
@@ -666,7 +674,7 @@ export const GridMap: React.FC<GridMapProps> = ({
             }}
         >
             {/* Top Floating Glass Header */}
-            <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-6 py-5 z-[70] bg-gradient-to-b from-black/10 to-transparent pointer-events-none">
+            <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-6 py-5 z-70 bg-linear-to-b from-black/10 to-transparent pointer-events-none">
                 <button
                     onClick={onBack}
                     className="w-10 h-10 rounded-full flex items-center justify-center transition-all pointer-events-auto shadow-lg hover:scale-105 active:scale-95"
@@ -727,7 +735,7 @@ export const GridMap: React.FC<GridMapProps> = ({
                             animate={{ opacity: 1, y: 0, scale: 1 }}
                             exit={{ opacity: 0, y: -10, scale: 0.98 }}
                             transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-                            className="absolute top-24 left-1/2 z-[85] w-[min(28rem,calc(100%-2rem))] -translate-x-1/2 pointer-events-auto"
+                            className="absolute top-24 left-1/2 z-85 w-[min(28rem,calc(100%-2rem))] -translate-x-1/2 pointer-events-auto"
                         >
                             <div className="relative rounded-full border shadow-2xl backdrop-blur-2xl theme-glass-panel">
                                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 opacity-40 w-4 h-4" />
@@ -817,7 +825,7 @@ export const GridMap: React.FC<GridMapProps> = ({
             {items.length > 0 && (
                 <button
                     onClick={() => setShowSidePanel(true)}
-                    className="fixed bottom-6 right-6 z-[80] w-12 h-12 rounded-full flex items-center justify-center shadow-2xl transition-transform hover:scale-105 active:scale-95 pointer-events-auto border"
+                    className="fixed bottom-6 right-6 z-80 w-12 h-12 rounded-full flex items-center justify-center shadow-2xl transition-transform hover:scale-105 active:scale-95 pointer-events-auto border"
                     style={{
                         backgroundColor: isDaylight ? 'rgba(255,255,255,0.8)' : 'rgba(0,0,0,0.5)',
                         backdropFilter: 'blur(12px)',

@@ -1,5 +1,6 @@
 import type { AmllDbPlatform, LyricData } from '../../../types';
 import { parseLyricsByFormat } from '../parserCore';
+import { get2FMusicBaseUrl } from '../../path';
 
 // src/utils/lyrics/providers/amllDbProvider.ts
 
@@ -21,7 +22,8 @@ export const buildAmllDbLyricsUrl = (platform: AmllDbPlatform, musicId: number |
 
 const buildAmllDbRequestUrl = (platform: AmllDbPlatform, musicId: number | string): string => {
     const targetUrl = buildAmllDbLyricsUrl(platform, musicId);
-    return getElectronBridge() ? targetUrl : `${import.meta.env.BASE_URL}api/lyric-proxy?url=${encodeURIComponent(targetUrl)}`;
+    const base = get2FMusicBaseUrl();
+    return getElectronBridge() ? targetUrl : `${base}/api/lyric-proxy?url=${encodeURIComponent(targetUrl)}`;
 };
 
 async function requestAmllDb(platform: AmllDbPlatform, musicId: number | string): Promise<{ ok: boolean; status: number; text: () => Promise<string> }> {

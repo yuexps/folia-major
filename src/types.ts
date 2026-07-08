@@ -361,6 +361,7 @@ export interface NowPlayingTrackSnapshot {
   durationMs: number | null;
   isVideo?: boolean;
   isAdvertisement?: boolean;
+  liked?: boolean;
 }
 
 export interface NowPlayingLyricPayload {

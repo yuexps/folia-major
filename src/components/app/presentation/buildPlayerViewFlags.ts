@@ -12,7 +12,7 @@ export const buildPlayerViewFlags = ({
     stageActiveEntryKind,
     audioSrc,
     duration,
-    isIframeMode,
+    fromFullPlayerOverlay,
 }: {
     currentView: string;
     disableHomeDynamicBackground: boolean;
@@ -24,7 +24,7 @@ export const buildPlayerViewFlags = ({
     stageActiveEntryKind: string | null;
     audioSrc: string | null;
     duration: number;
-    isIframeMode: boolean;
+    fromFullPlayerOverlay: boolean;
 }) => {
     const isPlayerView = currentView === 'player';
     return {
@@ -34,7 +34,7 @@ export const buildPlayerViewFlags = ({
         shouldHidePlayerTranslationSubtitle: isPlayerView && hidePlayerTranslationSubtitle,
         shouldHidePlayerRightPanelButton: isPlayerView && hidePlayerRightPanelButton,
         canToggleCurrentPlayback: !isNowPlayingControlDisabled && Boolean(
-            isIframeMode || audioSrc || (activePlaybackContext === 'stage' && stageActiveEntryKind === 'lyrics' && duration > 0),
+            fromFullPlayerOverlay || audioSrc || (activePlaybackContext === 'stage' && stageActiveEntryKind === 'lyrics' && duration > 0),
         ),
     };
 };

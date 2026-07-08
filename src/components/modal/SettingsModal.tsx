@@ -222,8 +222,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     } = useSettingsUiStore(useShallow(selectSettingsUiSnapshot));
 
     const isElectronWindow = typeof window !== 'undefined' && Boolean((window as any).electron);
-    const isIframeMode = typeof window !== 'undefined' &&
-        new URLSearchParams(window.location.search).get('mode') === 'iframe' &&
+    const fromFullPlayerOverlay = typeof window !== 'undefined' &&
         new URLSearchParams(window.location.search).get('from') === 'FullPlayerOverlay';
     const enableNowPlayingStage = !isElectronWindow || enableNowPlayingStageFromStore;
 
@@ -293,8 +292,22 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     const [cacheDirectoryIsDefault, setCacheDirectoryIsDefault] = useState(true);
     const [cacheDirectoryStatus, setCacheDirectoryStatus] = useState<'idle' | 'choosing'>('idle');
     const [stageActionStatus, setStageActionStatus] = useState<'idle' | 'regenerating'>('idle');
-    const configuredAiProvider = isElectron ? electronSettings.AI_PROVIDER : import.meta.env.VITE_AI_PROVIDER;
+    const configuredAiProvider = isElectron ? electronSettings.AI_PROVIDER : (electronSettings.AI_PROVIDER || import.meta.env.VITE_AI_PROVIDER);
     const aiServiceLabel = configuredAiProvider === 'openai' ? 'OpenAI Compatible' : 'Google Gemini';
+
+    useEffect(() => {
+        if (!isElectron) {
+            setElectronSettings(prev => ({
+                ...prev,
+                GEMINI_API_KEY: localStorage.getItem('gemini_api_key') || '',
+                OPENAI_API_KEY: localStorage.getItem('openai_api_key') || '',
+                OPENAI_API_URL: localStorage.getItem('openai_api_url') || '',
+                OPENAI_API_MODEL: localStorage.getItem('openai_api_model') || '',
+                AI_PROVIDER: localStorage.getItem('ai_provider') || 'gemini',
+            }));
+        }
+    }, [isElectron]);
+
     useEffect(() => {
         if ((window as any).electron) {
             setIsElectron(true);

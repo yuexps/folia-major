@@ -718,6 +718,10 @@ const ArtistGridView: React.FC<ArtistGridViewProps> = ({
     // Setup arrow keyboard navigation
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
+            const fromFullPlayerOverlay = typeof window !== 'undefined' &&
+                new URLSearchParams(window.location.search).get('from') === 'FullPlayerOverlay';
+            if (fromFullPlayerOverlay) return;
+
             if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
 
             if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
@@ -859,7 +863,7 @@ const ArtistGridView: React.FC<ArtistGridViewProps> = ({
                             </div>
 
                             <div className="flex-1 overflow-hidden mt-3 mb-2">
-                                <p className="text-xs opacity-65 leading-relaxed break-words whitespace-pre-wrap">
+                                <p className="text-xs opacity-65 leading-relaxed wrap-break-word whitespace-pre-wrap">
                                     {item.description || '暂无详细介绍'}
                                 </p>
                             </div>
@@ -973,7 +977,7 @@ const ArtistGridView: React.FC<ArtistGridViewProps> = ({
 
             {/* Title display inside viewport header */}
             <div
-                className="absolute left-1/2 top-5 -translate-x-1/2 z-[30] text-center flex flex-col items-center select-none px-5 py-2 rounded-2xl backdrop-blur-md"
+                className="absolute left-1/2 top-5 -translate-x-1/2 z-30 text-center flex flex-col items-center select-none px-5 py-2 rounded-2xl backdrop-blur-md"
                 style={{
                     backgroundColor: 'color-mix(in srgb, var(--bg-color) 20%, transparent)',
                     color: 'var(--text-primary)',
@@ -1053,7 +1057,7 @@ const ArtistGridView: React.FC<ArtistGridViewProps> = ({
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         onClick={() => setShowFullBio(false)}
-                        className="absolute inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-2xl p-4"
+                        className="absolute inset-0 z-100 flex items-center justify-center bg-black/60 backdrop-blur-2xl p-4"
                     >
                         <motion.div
                             initial={{ scale: 0.95, y: 15 }}
@@ -1081,7 +1085,7 @@ const ArtistGridView: React.FC<ArtistGridViewProps> = ({
                                 )}
                             </div>
 
-                            <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 leading-relaxed text-sm opacity-80 break-words whitespace-pre-wrap">
+                            <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 leading-relaxed text-sm opacity-80 wrap-break-word whitespace-pre-wrap">
                                 {artistInfo.briefDesc}
                             </div>
                         </motion.div>

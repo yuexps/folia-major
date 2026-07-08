@@ -1,4 +1,5 @@
 import { NeteaseUser, NeteasePlaylist, NoCopyrightRecommendation, SongPrivilege, SongResult } from "../types";
+import { get2FMusicBaseUrl } from "../utils/path";
 
 type UnavailableSongReplacement = {
   replacementSong: SongResult;
@@ -40,7 +41,9 @@ const getConfiguredApiBase = () => {
     return process.env.VITE_NETEASE_API_BASE;
   }
 
-  return null;
+  // 默认根据当前 Folia 的访问路径，动态反推 2FMusic 宿主代理接口
+  const base = get2FMusicBaseUrl();
+  return base ? `${base}/api/netease` : '../api/netease';
 };
 
 const getApiBase = async () => {

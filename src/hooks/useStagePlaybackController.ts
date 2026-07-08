@@ -80,6 +80,7 @@ type UseStagePlaybackControllerParams = {
     setStatusMsg: SetState<StatusMessage | null>;
     navigateToPlayer: () => void;
     setNowPlayingLoopMode: (mode: 'off' | 'all' | 'one') => void;
+    handleSetVolume: (volume: number) => void;
 };
 
 type LoadPlaybackOptions = {
@@ -113,6 +114,24 @@ const tryOnlineScrapingLyrics = async (title: string, artist: string, durationMs
         console.warn('[NowPlaying][Scraper] Error during autoMatchBestLyric:', e);
     }
     return null;
+};
+
+const normalizeQueueSong = (raw: any): SongResult => {
+    if (!raw || typeof raw !== 'object') {
+        return {} as SongResult;
+    }
+    return {
+        id: raw.id,
+        name: raw.title || '',
+        ar: [{ id: 0, name: raw.artist || '' }],
+        artists: [{ id: 0, name: raw.artist || '' }],
+        al: { id: 0, name: raw.album || '', picUrl: raw.cover || undefined },
+        album: { id: 0, name: raw.album || '', picUrl: raw.cover || undefined },
+        dt: raw.durationMs || 0,
+        duration: Math.max(0, Math.floor((raw.durationMs || 0) / 1000)),
+        sourceType: 'cloud',
+        isStage: true,
+    } as unknown as SongResult;
 };
 
 // Keeps Stage / Now Playing state isolated from the main player snapshot.
@@ -152,6 +171,7 @@ export function useStagePlaybackController({
     setStatusMsg,
     navigateToPlayer,
     setNowPlayingLoopMode,
+    handleSetVolume,
 }: UseStagePlaybackControllerParams) {
     const [stageStatus, setStageStatus] = useState<StageStatus | null>(null);
     const [nowPlayingConnectionStatus, setNowPlayingConnectionStatus] = useState<NowPlayingConnectionStatus>('disabled');
@@ -222,15 +242,16 @@ export function useStagePlaybackController({
         return hash;
     };
 
-    const isIframeMode = typeof window !== 'undefined' &&
-        new URLSearchParams(window.location.search).get('mode') === 'iframe' &&
+    const fromFullPlayerOverlay = typeof window !== 'undefined' &&
         new URLSearchParams(window.location.search).get('from') === 'FullPlayerOverlay';
 
-    const stageSource: StageSource | null = isElectronWindow
-        ? (stageStatus?.modeEnabled ? (stageStatus?.source ?? 'stage-api') : null)
-        : 'now-playing';
+    const stageSource: StageSource | null = fromFullPlayerOverlay
+        ? 'now-playing'
+        : (isElectronWindow
+            ? (stageStatus?.modeEnabled ? (stageStatus?.source ?? 'stage-api') : null)
+            : 'now-playing');
     const isNowPlayingStageActive = activePlaybackContext === 'stage' && stageSource === 'now-playing';
-    const shouldPublishNowPlayingState = isDev || isNowPlayingStageActive;
+    const shouldPublishNowPlayingState = isDev || isNowPlayingStageActive || fromFullPlayerOverlay;
     shouldPublishNowPlayingStateRef.current = shouldPublishNowPlayingState;
 
     const buildPlaybackSnapshot = useCallback((): PlaybackSnapshot => ({
@@ -328,7 +349,7 @@ export function useStagePlaybackController({
     }, [audioRef, clearPlaybackSurface, currentSongRef]);
 
     const buildStagePlaybackSong = useCallback((session: StageMediaSession): SongResult => {
-        const id = isIframeMode && session.title && session.artist
+        const id = fromFullPlayerOverlay && session.title && session.artist
             ? -Math.abs(hashCode(`${session.title}_${session.artist}`) || 1)
             : -Math.max(1, Math.floor(session.updatedAt || Date.now()));
         return {
@@ -344,7 +365,7 @@ export function useStagePlaybackController({
             isStage: true,
             stageData: session,
         } as SongResult;
-    }, [isIframeMode]);
+    }, [fromFullPlayerOverlay]);
 
     const resetStageLyricsClock = useCallback(() => {
         stageLyricsClockRef.current = {
@@ -505,7 +526,7 @@ export function useStagePlaybackController({
         paused: boolean,
         options: { onlyIfDrifted?: boolean; source: NowPlayingDebugInfo['lastQuerySource']; }
     ) => {
-        if (isIframeMode) {
+        if (fromFullPlayerOverlay) {
             return false;
         }
         const requestId = nowPlayingPreciseQueryRequestIdRef.current + 1;
@@ -558,7 +579,7 @@ export function useStagePlaybackController({
     }, [applyNowPlayingPreciseAnchor, isDev, updateNowPlayingDebugInfo]);
 
     const buildStageLyricsPlaybackSong = useCallback((session: StageLyricsSession, lyricData: LyricData): SongResult => {
-        const id = isIframeMode && (session.title || lyricData.title) && (session.artist || lyricData.artist)
+        const id = fromFullPlayerOverlay && (session.title || lyricData.title) && (session.artist || lyricData.artist)
             ? -Math.abs(hashCode(`${session.title || lyricData.title}_${session.artist || lyricData.artist}`) || 1)
             : -Math.max(1, Math.floor(session.updatedAt || Date.now()));
         return {
@@ -574,7 +595,7 @@ export function useStagePlaybackController({
             isStage: true,
             stageData: session,
         } as SongResult;
-    }, [isIframeMode]);
+    }, [fromFullPlayerOverlay]);
 
     const buildNowPlayingLyricsSession = useCallback((track: NowPlayingTrackSnapshot | null, payload: NowPlayingLyricPayload): StageLyricsSession | null => {
         const lyricSource = buildNowPlayingLyricSource(payload);
@@ -615,7 +636,7 @@ export function useStagePlaybackController({
                 console.warn('[Stage] Failed to parse stage lyrics', error);
             }
         }
-        if (isIframeMode) {
+        if (fromFullPlayerOverlay) {
             try {
                 const state = await loadOnlineLyricsState(stageSong);
                 if (state) {
@@ -648,7 +669,7 @@ export function useStagePlaybackController({
         clearPlaybackSurface,
         currentSongRef,
         currentTime,
-        isIframeMode,
+        fromFullPlayerOverlay,
         pendingResumeTimeRef,
         resetStageLyricsClock,
         setAudioSrc,
@@ -695,7 +716,7 @@ export function useStagePlaybackController({
         const nextLineIndex = findLatestActiveLineIndex(parsedLyrics.lines, initialTime);
         const stageSong = buildStageLyricsPlaybackSong(session, parsedLyrics);
 
-        if (isIframeMode) {
+        if (fromFullPlayerOverlay) {
             try {
                 const state = await loadOnlineLyricsState(stageSong);
                 if (state) {
@@ -731,7 +752,7 @@ export function useStagePlaybackController({
         clearPlaybackSurface,
         currentSongRef,
         currentTime,
-        isIframeMode,
+        fromFullPlayerOverlay,
         pendingResumeTimeRef,
         resetStageLyricsClock,
         setAudioSrc,
@@ -798,7 +819,7 @@ export function useStagePlaybackController({
         const fallbackAlbum = track?.album || '';
         const fallbackCoverUrl = track?.coverUrl || null;
         const resolvedDurationSec = durationSec || (renderableLyrics ? getStageLyricsTimelineBounds(renderableLyrics).endTimeSec : 0);
-        const fallbackSongId = isIframeMode && (fallbackTitle || fallbackArtist)
+        const fallbackSongId = fromFullPlayerOverlay && (fallbackTitle || fallbackArtist)
             ? -Math.abs(hashCode(`${fallbackTitle}_${fallbackArtist}`) || 1)
             : -Math.max(1, Math.floor(Date.now()));
 
@@ -813,11 +834,12 @@ export function useStagePlaybackController({
             dt: Math.max(0, Math.floor(resolvedDurationSec * 1000)),
             sourceType: 'cloud',
             isStage: true,
+            liked: track?.liked ?? false,
         } as SongResult) : null;
 
         let finalLyrics = renderableLyrics;
         let onlineState: OnlineLyricsState | undefined = undefined;
-        if (isIframeMode && fallbackSong) {
+        if (fromFullPlayerOverlay && fallbackSong) {
             try {
                 const state = await loadOnlineLyricsState(fallbackSong);
                 if (state) {
@@ -863,7 +885,7 @@ export function useStagePlaybackController({
         currentSongRef,
         getNowPlayingDisplayTime,
         isDev,
-        isIframeMode,
+        fromFullPlayerOverlay,
         isNowPlayingStageActive,
         pendingResumeTimeRef,
         setAudioSrc,
@@ -1213,12 +1235,18 @@ export function useStagePlaybackController({
             },
             onQueue: (queue) => {
                 if (shouldPublishNowPlayingStateRef.current) {
-                    setPlayQueue(queue);
+                    const normalized = (queue || []).map(normalizeQueueSong);
+                    setPlayQueue(normalized);
                 }
             },
             onLoopMode: (loopMode) => {
                 if (shouldPublishNowPlayingStateRef.current) {
                     setNowPlayingLoopMode(loopMode);
+                }
+            },
+            onVolume: (vol) => {
+                if (shouldPublishNowPlayingStateRef.current) {
+                    handleSetVolume(vol);
                 }
             },
         });
@@ -1333,6 +1361,14 @@ export function useStagePlaybackController({
             nowPlayingContentLoadKeyRef.current = null;
         }
     }, [activePlaybackContext]);
+
+    useEffect(() => {
+        if (stageSource === 'now-playing' && activePlaybackContext === 'stage' && currentSong && nowPlayingTrack) {
+            if ((currentSong as any).liked !== nowPlayingTrack.liked) {
+                setCurrentSong(prev => prev ? { ...prev, liked: nowPlayingTrack.liked } : null);
+            }
+        }
+    }, [nowPlayingTrack?.liked, currentSong?.id, stageSource, activePlaybackContext]);
 
     useEffect(() => {
         if (stageSource !== 'now-playing') {

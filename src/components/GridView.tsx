@@ -251,9 +251,9 @@ export const PolaroidCard = React.memo<{
                                     e.stopPropagation();
                                     onRemoveTrack();
                                 }}
-                                className="absolute top-2 right-2 w-7 h-7 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center shadow-lg border border-white/20 z-[60] active:scale-90 transition-transform cursor-pointer"
+                                className="absolute top-2 right-2 w-7 h-7 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center shadow-lg border border-white/20 z-60 active:scale-90 transition-transform cursor-pointer"
                             >
-                                <X size={14} className="stroke-[3]" />
+                                <X size={14} className="stroke-3" />
                             </motion.button>
                         )}
                     </AnimatePresence>
@@ -263,12 +263,12 @@ export const PolaroidCard = React.memo<{
                 <div className="w-full flex-1 flex flex-col justify-between pt-3 text-left min-w-0">
                     <div className="space-y-1 mb-2">
                         {/* Title */}
-                        <div className="text-s font-bold tracking-tight opacity-90 max-w-full line-clamp-4 whitespace-normal break-words">
+                        <div className="text-s font-bold tracking-tight opacity-90 max-w-full line-clamp-4 whitespace-normal wrap-break-word">
                             {item.name}
                         </div>
                         {/* Clickable Artists */}
                         {item.description && (
-                            <div className="text-[10px] opacity-55 max-w-full font-medium line-clamp-3 whitespace-normal break-words">
+                            <div className="text-[10px] opacity-55 max-w-full font-medium line-clamp-3 whitespace-normal wrap-break-word">
                                 {mode === 'tracks' && onSelectArtist && item.rawTrack?.ar ? (
                                     <span className="flex gap-1 flex-wrap">
                                         {item.rawTrack.ar.map((artist, idx) => (
@@ -308,7 +308,7 @@ export const PolaroidCard = React.memo<{
                                                 onSelectAlbum(alId);
                                             }
                                         }}
-                                        className="text-[9px] opacity-35 font-mono line-clamp-2 whitespace-normal break-words max-w-full hover:underline hover:opacity-85 cursor-pointer"
+                                        className="text-[9px] opacity-35 font-mono line-clamp-2 whitespace-normal wrap-break-word max-w-full hover:underline hover:opacity-85 cursor-pointer"
                                     >
                                         {item.rawTrack.al?.name || item.rawTrack.album?.name || ''}
                                     </span>
@@ -1337,6 +1337,10 @@ export const GridView: React.FC<GridViewProps> = ({
                 return;
             }
 
+            const fromFullPlayerOverlay = typeof window !== 'undefined' &&
+                new URLSearchParams(window.location.search).get('from') === 'FullPlayerOverlay';
+            if (fromFullPlayerOverlay) return;
+
             if (event.altKey || event.ctrlKey || event.metaKey) return;
             if (event.key === 'Process' || event.key === 'Unidentified') {
                 setShowSearchPanel(true);
@@ -1525,6 +1529,10 @@ export const GridView: React.FC<GridViewProps> = ({
     // Setup arrow keyboard navigation
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
+            const fromFullPlayerOverlay = typeof window !== 'undefined' &&
+                new URLSearchParams(window.location.search).get('from') === 'FullPlayerOverlay';
+            if (fromFullPlayerOverlay) return;
+
             if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
 
             if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
@@ -1577,7 +1585,7 @@ export const GridView: React.FC<GridViewProps> = ({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[110] flex flex-col justify-between overflow-hidden select-none"
+            className="fixed inset-0 z-110 flex flex-col justify-between overflow-hidden select-none"
             style={{
                 backgroundColor: 'var(--bg-color)',
                 color: 'var(--text-primary)',
@@ -1606,7 +1614,7 @@ export const GridView: React.FC<GridViewProps> = ({
                     }
                     onBack();
                 }}
-                className="absolute left-6 top-5 w-10 h-10 rounded-full flex items-center justify-center transition-all shadow-lg hover:scale-105 active:scale-95 z-[70]"
+                className="absolute left-6 top-5 w-10 h-10 rounded-full flex items-center justify-center transition-all shadow-lg hover:scale-105 active:scale-95 z-70"
                 style={{
                     backgroundColor: isDaylight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.08)',
                     backdropFilter: 'blur(8px)',
@@ -1622,7 +1630,7 @@ export const GridView: React.FC<GridViewProps> = ({
                         setShowCutInPanel(!showCutInPanel);
                     }
                 }}
-                className="absolute left-1/2 top-5 -translate-x-1/2 z-[70] text-center flex flex-col items-center select-none cursor-pointer hover:scale-[1.01] active:scale-98 transition-all px-5 py-2 rounded-2xl backdrop-blur-md"
+                className="absolute left-1/2 top-5 -translate-x-1/2 z-70 text-center flex flex-col items-center select-none cursor-pointer hover:scale-[1.01] active:scale-98 transition-all px-5 py-2 rounded-2xl backdrop-blur-md"
                 style={{
                     backgroundColor: 'color-mix(in srgb, var(--bg-color) 20%, transparent)',
                     color: 'var(--text-primary)',
@@ -1678,7 +1686,7 @@ export const GridView: React.FC<GridViewProps> = ({
                             animate={{ opacity: 1, y: 0, scale: 1 }}
                             exit={{ opacity: 0, y: -10, scale: 0.98 }}
                             transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-                            className="absolute top-24 left-1/2 z-[85] w-[min(28rem,calc(100%-2rem))] -translate-x-1/2 pointer-events-auto"
+                            className="absolute top-24 left-1/2 z-85 w-[min(28rem,calc(100%-2rem))] -translate-x-1/2 pointer-events-auto"
                         >
                             <div className="relative rounded-full border shadow-2xl backdrop-blur-2xl theme-glass-panel">
                                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 opacity-40 w-4 h-4" />
@@ -1779,7 +1787,7 @@ export const GridView: React.FC<GridViewProps> = ({
                             animate={{ opacity: 1, x: 0, scale: 1 }}
                             exit={{ opacity: 0, x: -60, scale: 0.95 }}
                             transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-                            className="absolute left-6 top-24 bottom-28 sm:bottom-6 w-80 rounded-3xl z-[80] overflow-y-auto hide-scrollbar flex flex-col p-6 shadow-2xl border backdrop-blur-2xl pointer-events-auto theme-glass-panel"
+                            className="absolute left-6 top-24 bottom-28 sm:bottom-6 w-80 rounded-3xl z-80 overflow-y-auto hide-scrollbar flex flex-col p-6 shadow-2xl border backdrop-blur-2xl pointer-events-auto theme-glass-panel"
                             style={{
                                 boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.2)',
                             }}
@@ -1886,7 +1894,7 @@ export const GridView: React.FC<GridViewProps> = ({
 
                                 {/* Description */}
                                 {(neteaseAlbumInfo?.description || collection.description) && (
-                                    <p className="text-xs opacity-65 leading-relaxed break-words whitespace-pre-wrap max-h-40 overflow-y-auto pr-1">
+                                    <p className="text-xs opacity-65 leading-relaxed wrap-break-word whitespace-pre-wrap max-h-40 overflow-y-auto pr-1">
                                         {neteaseAlbumInfo?.description || collection.description}
                                     </p>
                                 )}
@@ -2014,7 +2022,7 @@ export const GridView: React.FC<GridViewProps> = ({
             {mode === 'tracks' && displayTracks.length > 0 && (
                 <button
                     onClick={() => setShowSidePanel(true)}
-                    className="fixed bottom-6 right-6 z-[80] w-12 h-12 rounded-full flex items-center justify-center shadow-2xl transition-transform hover:scale-105 active:scale-95 pointer-events-auto border"
+                    className="fixed bottom-6 right-6 z-80 w-12 h-12 rounded-full flex items-center justify-center shadow-2xl transition-transform hover:scale-105 active:scale-95 pointer-events-auto border"
                     style={{
                         backgroundColor: isDaylight ? 'rgba(255,255,255,0.8)' : 'rgba(0,0,0,0.5)',
                         backdropFilter: 'blur(12px)',

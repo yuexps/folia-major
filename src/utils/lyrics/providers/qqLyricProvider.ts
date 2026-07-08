@@ -7,6 +7,7 @@
 
 import { SongResult } from '../../../types';
 import { parseLyricsByFormat } from '../parserCore';
+import { get2FMusicBaseUrl } from '../../path';
 import { detectTimedLyricFormat } from '../formatDetection';
 import { qrcDecrypt } from './qrcDecrypt';
 import { applyDetectedChorusEffects, applyNeteaseChorusByTime } from '../chorusEffects';
@@ -39,7 +40,8 @@ async function requestQQ(method: string, module: string, param: any): Promise<an
   };
 
   const targetUrl = 'https://u.y.qq.com/cgi-bin/musicu.fcg';
-  const url = isElectron ? targetUrl : `${import.meta.env.BASE_URL}api/lyric-proxy?url=${encodeURIComponent(targetUrl)}`;
+  const base = get2FMusicBaseUrl();
+  const url = isElectron ? targetUrl : `${base}/api/lyric-proxy?url=${encodeURIComponent(targetUrl)}`;
 
   const response = await fetch(url, {
     method: 'POST',

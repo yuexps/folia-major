@@ -65,7 +65,12 @@ const QueueTab: React.FC<QueueTabProps> = ({
     // Auto-scroll to current song
     React.useEffect(() => {
         if (shouldScrollToCurrent && currentSong && listRef.current) {
-            const currentIndex = playQueue.findIndex(s => s.id === currentSong.id);
+            const isStage = (currentSong as any)?.isStage;
+            const currentIndex = playQueue.findIndex(s => 
+                isStage 
+                    ? (s.name === currentSong.name && s.artists?.[0]?.name === currentSong.artists?.[0]?.name)
+                    : (s.id === currentSong.id)
+            );
             if (currentIndex >= 0) {
                 const isInitialMount = isInitialMountRef.current;
                 const songChanged = lastScrolledIndexRef.current !== currentIndex && lastScrolledIndexRef.current !== -1;
@@ -102,7 +107,10 @@ const QueueTab: React.FC<QueueTabProps> = ({
         ariaAttributes: { "aria-posinset": number; "aria-setsize": number; role: "listitem"; };
     }) => {
         const song = playQueue[index];
-        const isActive = currentSong?.id === song.id;
+        const isStage = (currentSong as any)?.isStage || (song as any)?.isStage;
+        const isActive = isStage
+            ? (currentSong?.name === song.name && currentSong?.artists?.[0]?.name === song.artists?.[0]?.name)
+            : (currentSong?.id === song.id);
         const isUnavailable = isSongMarkedUnavailable(song);
         const unavailableTagText = getSongUnavailableTagText(song, t('status.songUnavailableTag'));
         const activeRowClass = isDaylight ? 'bg-black/[0.08]' : 'bg-white/20';
@@ -123,7 +131,7 @@ const QueueTab: React.FC<QueueTabProps> = ({
                     <div className="text-xs font-medium truncate">
                         {song.name}
                         {isUnavailable && (
-                            <span className={`ml-2 inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium align-middle ${isDaylight ? 'border-black/8 bg-black/[0.04] text-zinc-600' : 'border-white/10 bg-white/[0.05] text-zinc-300'}`}>
+                            <span className={`ml-2 inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium align-middle ${isDaylight ? 'border-black/8 bg-black/4 text-zinc-600' : 'border-white/10 bg-white/5 text-zinc-300'}`}>
                                 {unavailableTagText}
                             </span>
                         )}

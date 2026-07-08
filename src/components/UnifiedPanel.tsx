@@ -231,15 +231,14 @@ const UnifiedPanel: React.FC<UnifiedPanelProps> = ({
     const [showGuideLine, setShowGuideLine] = React.useState(false);
     const [isDragging, setIsDragging] = React.useState(false);
 
-    const isIframeMode = typeof window !== 'undefined' &&
-        new URLSearchParams(window.location.search).get('mode') === 'iframe' &&
+    const fromFullPlayerOverlay = typeof window !== 'undefined' &&
         new URLSearchParams(window.location.search).get('from') === 'FullPlayerOverlay';
 
     const isStage = isStageContext || Boolean(currentSong && (currentSong as any).isStage === true);
     const isNavidrome = currentSong && (currentSong as any).isNavidrome === true;
     const isLocal = currentSong && !isNavidrome && (((currentSong as any).isLocal === true) || Boolean((currentSong as any).localData));
     const isNetease = Boolean(currentSong && !isLocal && !isNavidrome && !isStage);
-    const showOnlineLyricsTab = isNetease || (isStage && isIframeMode);
+    const showOnlineLyricsTab = isNetease || (isStage && fromFullPlayerOverlay);
     const canCreateLocalPlaylist = isLocal;
     const canCreateNavidromePlaylist = isNavidrome;
     const canAddCurrentSongToPlaylist =
@@ -314,7 +313,7 @@ const UnifiedPanel: React.FC<UnifiedPanelProps> = ({
         isFmMode 
             ? { id: 'queue' as PanelTab, label: t('home.radio') || '私人FM', icon: Radio }
             : { id: 'queue' as PanelTab, label: t('panel.playlist'), icon: ListMusic },
-        { id: 'account' as PanelTab, label: t('panel.account'), icon: UserIcon },
+        ...(!fromFullPlayerOverlay ? [{ id: 'account' as PanelTab, label: t('panel.account'), icon: UserIcon }] : []),
     ];
 
     if (isLocal) {
@@ -342,7 +341,7 @@ const UnifiedPanel: React.FC<UnifiedPanelProps> = ({
         : supportsHover
             ? 'translate-x-1/2 opacity-60 group-hover:translate-x-0 group-hover:opacity-100 md:translate-x-0 md:opacity-100 md:hover:scale-105'
             : 'translate-x-1/2 opacity-60';
-    const canSlideOpenCommandPalette = !isOpen && Boolean(onOpenCommandPalette);
+    const canSlideOpenCommandPalette = !isOpen && Boolean(onOpenCommandPalette) && !fromFullPlayerOverlay;
     const setCommandDestinationFeedback = (progress: number) => {
         const iconContainer = trackEndIconRef.current;
         if (!iconContainer) {
@@ -624,7 +623,7 @@ const UnifiedPanel: React.FC<UnifiedPanelProps> = ({
 
     return (
         <div
-            className="absolute bottom-8 right-0 z-[60] flex flex-col items-end gap-4 pointer-events-none"
+            className="absolute bottom-8 right-0 z-60 flex flex-col items-end gap-4 pointer-events-none"
             onClick={(e) => e.stopPropagation()}
         >
             <div className="pr-4 md:pr-8">
@@ -660,7 +659,7 @@ const UnifiedPanel: React.FC<UnifiedPanelProps> = ({
                                             ? 'opacity-0 group-hover:opacity-100'
                                             : (isCoverActionsVisible ? 'opacity-100' : 'opacity-0')
                                     }`}>
-                                        <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-black/40 via-black/10 to-transparent" />
+                                        <div className="absolute inset-x-0 bottom-0 h-28 bg-linear-to-t from-black/40 via-black/10 to-transparent" />
                                     </div>
 
                                     {/* 左上角：打开设置 */}
@@ -672,11 +671,16 @@ const UnifiedPanel: React.FC<UnifiedPanelProps> = ({
                                         }`}>
                                             <button
                                                 type="button"
+                                                disabled={fromFullPlayerOverlay}
                                                 onClick={(event) => {
                                                     event.stopPropagation();
                                                     handleOpenSettings();
                                                 }}
-                                                className="w-11 h-11 rounded-full border border-white/15 bg-black/25 text-white/90 backdrop-blur-md flex items-center justify-center transition-all hover:bg-black/40 hover:text-white"
+                                                className={`w-11 h-11 rounded-full border border-white/15 bg-black/25 text-white/90 backdrop-blur-md flex items-center justify-center transition-all ${
+                                                    fromFullPlayerOverlay
+                                                        ? 'opacity-30 cursor-not-allowed pointer-events-none'
+                                                        : 'hover:bg-black/40 hover:text-white'
+                                                }`}
                                                 title={t('ui.options') || '设置'}
                                             >
                                                 <Settings size={18} />
@@ -693,10 +697,14 @@ const UnifiedPanel: React.FC<UnifiedPanelProps> = ({
                                             type="button"
                                             onClick={(event) => {
                                                 event.stopPropagation();
-                                                handleNavigateHome();
+                                                if (fromFullPlayerOverlay) {
+                                                    window.parent.postMessage({ type: 'folia-exit' }, '*');
+                                                } else {
+                                                    handleNavigateHome();
+                                                }
                                             }}
                                             className="w-11 h-11 rounded-full border border-white/15 bg-black/25 text-white/90 backdrop-blur-md flex items-center justify-center transition-all hover:bg-black/40 hover:text-white"
-                                            title={t('ui.backToHome') || '返回主页'}
+                                            title={fromFullPlayerOverlay ? '返回经典模式' : (t('ui.backToHome') || '返回主页')}
                                         >
                                             <HomeIcon size={18} />
                                         </button>
@@ -725,19 +733,33 @@ const UnifiedPanel: React.FC<UnifiedPanelProps> = ({
                                 </div>
 
                                 {/* Tab Switcher */}
-                                <div className={`flex ${tabSwitcherBg} p-1 rounded-xl mb-4`}>
-                                    {tabs.map((tab) => (
-                                        <button
-                                            key={tab.id}
-                                            onClick={() => onTabChange(tab.id)}
-                                            className={`flex-1 py-2 flex items-center justify-center transition-all rounded-lg
-                                                ${currentTab === tab.id ? `${activeTabBg} shadow-sm` : 'opacity-40 hover:opacity-100'}`}
-                                            title={tab.label}
-                                            style={{ color: 'var(--text-primary)' }}
-                                        >
-                                            <tab.icon size={16} />
-                                        </button>
-                                    ))}
+                                <div className={`flex ${tabSwitcherBg} p-1 rounded-xl mb-4 relative`}>
+                                    {tabs.filter(tab => !(fromFullPlayerOverlay && tab.id === 'account')).map((tab) => {
+                                        const isActive = currentTab === tab.id;
+                                        return (
+                                            <button
+                                                key={tab.id}
+                                                onClick={() => onTabChange(tab.id)}
+                                                className="flex-1 py-2 flex items-center justify-center relative rounded-lg opacity-40 hover:opacity-100"
+                                                style={{ 
+                                                    color: 'var(--text-primary)',
+                                                    opacity: isActive ? 1 : undefined 
+                                                }}
+                                                title={tab.label}
+                                            >
+                                                {isActive && (
+                                                    <motion.div
+                                                        layoutId="unified-panel-active-tab-pill"
+                                                        className={`absolute inset-0 ${activeTabBg} shadow-sm rounded-lg z-0`}
+                                                        transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                                                    />
+                                                )}
+                                                <span className="relative z-10 flex items-center justify-center">
+                                                    <tab.icon size={16} />
+                                                </span>
+                                            </button>
+                                        );
+                                    })}
                                 </div>
 
                                 {/* Tab Content */}
@@ -821,7 +843,7 @@ const UnifiedPanel: React.FC<UnifiedPanelProps> = ({
                                                 isDaylight={isDaylight}
                                                 primaryColor={theme.primaryColor}
                                             />
-                                        ) : isStage ? (
+                                        ) : isStage && !fromFullPlayerOverlay ? (
                                             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col h-full max-h-[300px]">
                                                 <div className="flex items-center justify-center h-full px-4 text-center text-xs opacity-50">
                                                     {playbackControlsDisabled
@@ -966,7 +988,7 @@ const UnifiedPanel: React.FC<UnifiedPanelProps> = ({
                             : { opacity: 0, x: 20, y: 12, scale: 0.92 }
                         }
                         transition={{ duration: 0.24, ease: 'easeOut' }}
-                        className="pointer-events-auto fixed bottom-8 right-0 z-[60] pr-4 md:pr-8 group w-20 flex justify-end"
+                        className="pointer-events-auto fixed bottom-8 right-0 z-60 pr-4 md:pr-8 group w-20 flex justify-end"
                     >
                         {/* Wrapper for both track and button to guarantee perfect alignment across browsers */}
                         <div className={`relative w-12 h-12 transition-all duration-300 transform ${toggleButtonMotionClass}`}>

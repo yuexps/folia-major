@@ -2,6 +2,8 @@ import { DualTheme } from "../types";
 import { applyStoredAnimationIntensityToDualTheme } from "./themePreferences";
 import { sanitizeDualTheme } from "./themeSanitizer";
 
+import { get2FMusicBaseUrl } from "../utils/path";
+
 const getErrorMessage = (error: unknown) => {
   if (error instanceof Error) {
     return error.message;
@@ -20,14 +22,15 @@ export const generateThemeFromLyrics = async (
   options?: { isPureMusic?: boolean; songTitle?: string }
 ): Promise<DualTheme> => {
   try {
-    // Check if running in Electron environment
     if ((window as any).electron && typeof (window as any).electron.generateTheme === 'function') {
       const dualTheme = await (window as any).electron.generateTheme(lyricsText, options);
       return sanitizeDualTheme(dualTheme);
     }
 
-    const provider = import.meta.env.VITE_AI_PROVIDER;
-    const endpoint = provider === 'openai' ? '/api/generate-theme_openai' : '/api/generate-theme';
+    const base = get2FMusicBaseUrl();
+    const envProvider = import.meta.env.VITE_AI_PROVIDER;
+    const path = envProvider === 'openai' ? '/api/generate-theme_openai' : '/api/generate-theme';
+    const endpoint = base ? `${base.replace(/\/$/, '')}${path}` : path;
 
     const response = await fetch(endpoint, {
       method: 'POST',

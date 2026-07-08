@@ -188,7 +188,13 @@ export const useCommandPalette = ({
     }, [activeIndex, matches.length]);
 
     useEffect(() => {
+        const fromFullPlayerOverlay = typeof window !== 'undefined' &&
+            new URLSearchParams(window.location.search).get('from') === 'FullPlayerOverlay';
+
         const handleKeyDown = (event: KeyboardEvent) => {
+            if (fromFullPlayerOverlay) {
+                return;
+            }
             if (event.code !== 'KeyS') {
                 return;
             }

@@ -120,8 +120,7 @@ const IntegrationSettingsSubview: React.FC<IntegrationSettingsSubviewProps> = ({
         stageStatus,
     } = stage;
 
-    const isIframeMode = typeof window !== 'undefined' &&
-        new URLSearchParams(window.location.search).get('mode') === 'iframe' &&
+    const fromFullPlayerOverlay = typeof window !== 'undefined' &&
         new URLSearchParams(window.location.search).get('from') === 'FullPlayerOverlay';
     const enableNowPlayingStage = !isElectron || enableNowPlayingStageFromStore;
     const {

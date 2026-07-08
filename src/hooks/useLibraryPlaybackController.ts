@@ -132,8 +132,7 @@ export function useLibraryPlaybackController({
     const [showLyricMatchModal, setShowLyricMatchModal] = useState(false);
     const [showNaviLyricMatchModal, setShowNaviLyricMatchModal] = useState(false);
     const [showOnlineLyricMatchModal, setShowOnlineLyricMatchModal] = useState(false);
-    const isIframeMode = typeof window !== 'undefined' &&
-        new URLSearchParams(window.location.search).get('mode') === 'iframe' &&
+    const fromFullPlayerOverlay = typeof window !== 'undefined' &&
         new URLSearchParams(window.location.search).get('from') === 'FullPlayerOverlay';
     const localCoverObjectUrlsRef = useRef<Map<string, LocalCoverObjectUrlEntry>>(new Map());
     const managedCachedCoverObjectUrlRef = useRef<string | null>(null);
@@ -1014,13 +1013,13 @@ export function useLibraryPlaybackController({
     }, [currentSong, setIsPanelOpen]);
 
     const handleMatchOnlineLyrics = useCallback(() => {
-        if (!currentSong || (isStagePlaybackSong(currentSong) && !isIframeMode) || isLocalPlaybackSong(currentSong) || isNavidromePlaybackSong(currentSong)) {
+        if (!currentSong || (isStagePlaybackSong(currentSong) && !fromFullPlayerOverlay) || isLocalPlaybackSong(currentSong) || isNavidromePlaybackSong(currentSong)) {
             return;
         }
 
         setIsPanelOpen(false);
         setShowOnlineLyricMatchModal(true);
-    }, [currentSong, isIframeMode, setIsPanelOpen]);
+    }, [currentSong, fromFullPlayerOverlay, setIsPanelOpen]);
 
     const handleLyricMatchComplete = useCallback(async () => {
         setShowLyricMatchModal(false);
@@ -1047,7 +1046,7 @@ export function useLibraryPlaybackController({
     }, [currentSong, onPlayNavidromeSong, playQueue, setStatusMsg]);
 
     const handleImportOnlineLyrics = useCallback(async (content: string, fileName: string) => {
-        if (!currentSong || (isStagePlaybackSong(currentSong) && !isIframeMode) || isLocalPlaybackSong(currentSong) || isNavidromePlaybackSong(currentSong)) {
+        if (!currentSong || (isStagePlaybackSong(currentSong) && !fromFullPlayerOverlay) || isLocalPlaybackSong(currentSong) || isNavidromePlaybackSong(currentSong)) {
             return;
         }
 
@@ -1083,10 +1082,10 @@ export function useLibraryPlaybackController({
             console.error('Failed to import online lyrics', error);
             setStatusMsg({ type: 'error', text: 'Failed to save lyrics' });
         }
-    }, [currentSong, isIframeMode, persistLastPlaybackCache, playQueue, setCurrentLineIndex, setCurrentSong, setLyrics, setStatusMsg]);
+    }, [currentSong, fromFullPlayerOverlay, persistLastPlaybackCache, playQueue, setCurrentLineIndex, setCurrentSong, setLyrics, setStatusMsg]);
 
     const handleChangeOnlineLyricsSource = useCallback(async (source: 'online' | 'imported') => {
-        if (!currentSong || (isStagePlaybackSong(currentSong) && !isIframeMode) || isLocalPlaybackSong(currentSong) || isNavidromePlaybackSong(currentSong)) {
+        if (!currentSong || (isStagePlaybackSong(currentSong) && !fromFullPlayerOverlay) || isLocalPlaybackSong(currentSong) || isNavidromePlaybackSong(currentSong)) {
             return;
         }
 
@@ -1121,11 +1120,11 @@ export function useLibraryPlaybackController({
             console.error('Failed to switch online lyrics source', error);
             setStatusMsg({ type: 'error', text: 'Failed to save lyrics source' });
         }
-    }, [currentSong, isIframeMode, loadBaseOnlineLyrics, lyrics, persistLastPlaybackCache, playQueue, setCurrentLineIndex, setCurrentSong, setLyrics, setStatusMsg]);
+    }, [currentSong, fromFullPlayerOverlay, loadBaseOnlineLyrics, lyrics, persistLastPlaybackCache, playQueue, setCurrentLineIndex, setCurrentSong, setLyrics, setStatusMsg]);
 
     const handleOnlineLyricMatchComplete = useCallback(async () => {
         setShowOnlineLyricMatchModal(false);
-        if (!currentSong || (isStagePlaybackSong(currentSong) && !isIframeMode) || isLocalPlaybackSong(currentSong) || isNavidromePlaybackSong(currentSong)) {
+        if (!currentSong || (isStagePlaybackSong(currentSong) && !fromFullPlayerOverlay) || isLocalPlaybackSong(currentSong) || isNavidromePlaybackSong(currentSong)) {
             return;
         }
 
@@ -1142,10 +1141,10 @@ export function useLibraryPlaybackController({
         setCurrentLineIndex(-1);
         await persistLastPlaybackCache(updatedSong, playQueue);
         setStatusMsg({ type: 'success', text: t('status.matchSuccessful') || 'Match successful' });
-    }, [currentSong, isIframeMode, lyrics, persistLastPlaybackCache, playQueue, resolveOnlineSongLyricsState, setCurrentLineIndex, setCurrentSong, setLyrics, setStatusMsg, t]);
+    }, [currentSong, fromFullPlayerOverlay, lyrics, persistLastPlaybackCache, playQueue, resolveOnlineSongLyricsState, setCurrentLineIndex, setCurrentSong, setLyrics, setStatusMsg, t]);
 
     const handleClearOnlineLyricsState = useCallback(async () => {
-        if (!currentSong || (isStagePlaybackSong(currentSong) && !isIframeMode) || isLocalPlaybackSong(currentSong) || isNavidromePlaybackSong(currentSong)) {
+        if (!currentSong || (isStagePlaybackSong(currentSong) && !fromFullPlayerOverlay) || isLocalPlaybackSong(currentSong) || isNavidromePlaybackSong(currentSong)) {
             return;
         }
 
@@ -1167,7 +1166,7 @@ export function useLibraryPlaybackController({
             console.error('Failed to clear online lyrics state', error);
             setStatusMsg({ type: 'error', text: '清除失败' });
         }
-    }, [currentSong, isIframeMode, persistLastPlaybackCache, playQueue, resolveOnlineSongLyricsState, setCurrentLineIndex, setCurrentSong, setLyrics, setStatusMsg]);
+    }, [currentSong, fromFullPlayerOverlay, persistLastPlaybackCache, playQueue, resolveOnlineSongLyricsState, setCurrentLineIndex, setCurrentSong, setLyrics, setStatusMsg]);
 
     const handleHomeMatchSong = useCallback(async (song: LocalSong) => {
         await loadLocalSongs();

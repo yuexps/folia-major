@@ -74,7 +74,7 @@ const CarouselItem: React.FC<{
                         <Disc size={64} className="opacity-20" style={{ color: 'var(--text-primary)' }} />
                     </div>
                 )}
-                <div className="absolute inset-0 bg-gradient-to-tr from-white/10 to-transparent opacity-0 hover:opacity-100 transition-opacity" />
+                <div className="absolute inset-0 bg-linear-to-tr from-white/10 to-transparent opacity-0 hover:opacity-100 transition-opacity" />
             </div>
         </motion.div>
     );
@@ -229,6 +229,10 @@ const Carousel3D: React.FC<Carousel3DProps> = ({
         const THROTTLE_MS = 100;
 
         const handleKeyDown = (e: KeyboardEvent) => {
+            const fromFullPlayerOverlay = typeof window !== 'undefined' &&
+                new URLSearchParams(window.location.search).get('from') === 'FullPlayerOverlay';
+            if (fromFullPlayerOverlay) return;
+
             if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
             
             if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
@@ -317,7 +321,7 @@ const Carousel3D: React.FC<Carousel3DProps> = ({
                         style={{ minHeight: stageMinHeight }}
                     >
                         {/* Decorative Line Behind */}
-                        <div className="absolute top-1/2 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-y-1/2 z-0" />
+                        <div className="absolute top-1/2 left-0 right-0 h-px bg-linear-to-r from-transparent via-white/20 to-transparent -translate-y-1/2 z-0" />
 
                         {/* Center Focus Decoration */}
                         <div
