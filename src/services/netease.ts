@@ -125,7 +125,32 @@ const fetchWithCreds = async (endpoint: string, options: RequestInit = {}) => {
   }
 
   const res = await fetch(finalUrl, { ...defaultOptions, credentials: 'include' });
-  const data = await res.json();
+  
+  let data: any;
+  try {
+    if (typeof res.clone === 'function') {
+      try {
+        data = await res.clone().json();
+      } catch {
+        // 兼容非JSON响应与代理错误（如502 HTML）
+        const text = await res.text();
+        data = {
+          code: res.status,
+          message: text || res.statusText || 'Non-JSON response received'
+        };
+      }
+    } else {
+      // 兼容测试中的简陋Mock对象
+      data = await res.json();
+    }
+  } catch (e) {
+    // 捕获网络异常，防崩溃
+    data = {
+      code: res.status || 500,
+      message: e instanceof Error ? e.message : 'Failed to parse response'
+    };
+  }
+
 
   if (!storedCookie && cookieToUse && (data?.code === 301 || data?.code === 401 || data?.code === 403)) {
     if (typeof localStorage !== 'undefined' && typeof localStorage.removeItem === 'function') {
