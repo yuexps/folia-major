@@ -57,6 +57,8 @@ export interface VisualizerSharedProps {
     showSubtitleTranslation?: boolean;
     paused?: boolean;
     onBack?: () => void;
+    onPlayModeTabChange?: (mode: 'classic' | 'folia') => void;
+    playModeTab?: 'classic' | 'folia';
     onLyricLineSeek?: (lyricTimeSec: number) => void;
     isPreviewMode?: boolean;
     classicTuning?: ClassicTuning;

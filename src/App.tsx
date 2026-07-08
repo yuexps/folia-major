@@ -175,7 +175,22 @@ export default function App() {
         return [];
     });
 
-    // UI State
+    // fromFullPlayerOverlay 时固定 folia；否则同步读 localStorage 恢复上次选择
+    const [playModeTab, setPlayModeTab] = useState<'classic' | 'folia'>(() => {
+        if (fromFullPlayerOverlay) return 'folia';
+        const saved = localStorage.getItem('2fmusic_fullplayer_mode');
+        return (saved === 'classic' || saved === 'folia') ? saved : 'folia';
+    });
+
+    const handlePlayModeTabChange = (mode: 'classic' | 'folia') => {
+        setPlayModeTab(mode);
+        localStorage.setItem('2fmusic_fullplayer_mode', mode);
+        if (mode === 'classic') {
+            // 通知宿主切换到经典视图（区别于 folia-exit 关闭播放器）
+            window.parent.postMessage({ type: 'folia-switch-classic' }, '*');
+        }
+    };
+
     const [statusMsg, setStatusMsg] = useState<StatusMessage | null>(null);
     const [isPanelOpen, setIsPanelOpen] = useState(false);
     useElectronNeteaseApiStatus(setStatusMsg, t);
@@ -3038,6 +3053,8 @@ export default function App() {
                         urlBackgroundSelectedId={urlBackgroundSelectedId}
                         onLyricLineSeek={visualizerMode === 'monet' ? handleMonetLyricLineSeek : undefined}
                         onBack={fromFullPlayerOverlay ? () => window.parent.postMessage({ type: 'folia-exit' }, '*') : navigateToHome}
+                        playModeTab={fromFullPlayerOverlay ? playModeTab : undefined}
+                        onPlayModeTabChange={fromFullPlayerOverlay ? handlePlayModeTabChange : undefined}
                     />
                 )}
             </div>

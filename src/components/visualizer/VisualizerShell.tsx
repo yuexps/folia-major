@@ -33,6 +33,8 @@ type VisualizerShellSharedProps = Pick<
     | 'staticMode'
     | 'paused'
     | 'onBack'
+    | 'playModeTab'
+    | 'onPlayModeTabChange'
 >;
 
 interface VisualizerShellProps {
@@ -55,9 +57,13 @@ interface VisualizerShellProps {
     urlBackgroundSelectedId?: string | null;
     children: React.ReactNode;
     className?: string;
+    // fromFullPlayerOverlay 模式下的 tab 切换
+    playModeTab?: 'classic' | 'folia';
+    onPlayModeTabChange?: (mode: 'classic' | 'folia') => void;
 }
 
-const VisualizerShell = forwardRef<HTMLDivElement, VisualizerShellProps>(({
+const VisualizerShell = forwardRef<HTMLDivElement, VisualizerShellProps>((
+    {
     theme,
     audioPower,
     audioBands,
@@ -77,11 +83,14 @@ const VisualizerShell = forwardRef<HTMLDivElement, VisualizerShellProps>(({
     urlBackgroundSelectedId,
     children,
     className = '',
+    playModeTab,
+    onPlayModeTabChange,
 }, ref) => {
     const { t } = useTranslation();
     const fromFullPlayerOverlay = typeof window !== 'undefined' &&
         new URLSearchParams(window.location.search).get('from') === 'FullPlayerOverlay';
     const [showBackButton, setShowBackButton] = useState(false);
+    const [showTabSlider, setShowTabSlider] = useState(false);
     const resolvedCoverUrl = sharedProps?.coverUrl ?? coverUrl;
     const resolvedIsDaylight = sharedProps?.isDaylight ?? false;
     const resolvedUseCoverColorBg = sharedProps?.useCoverColorBg ?? useCoverColorBg;
@@ -99,6 +108,8 @@ const VisualizerShell = forwardRef<HTMLDivElement, VisualizerShellProps>(({
     const resolvedStaticMode = sharedProps?.staticMode ?? staticMode;
     const resolvedPaused = sharedProps?.paused ?? paused;
     const resolvedOnBack = sharedProps?.onBack ?? onBack;
+    const resolvedPlayModeTab = sharedProps?.playModeTab ?? playModeTab;
+    const resolvedOnPlayModeTabChange = sharedProps?.onPlayModeTabChange ?? onPlayModeTabChange;
     const shouldRenderCommonBackground = !resolvedTransparentBackground && resolvedBackgroundMode === 'common';
     const shouldRenderMonetBackground = !resolvedTransparentBackground && resolvedBackgroundMode === 'monet';
     const shouldRenderUrlBackground = !resolvedTransparentBackground && resolvedBackgroundMode === 'url';
@@ -122,24 +133,24 @@ const VisualizerShell = forwardRef<HTMLDivElement, VisualizerShellProps>(({
                 opacity: resolvedVisualizerOpacity,
             }}
             onMouseMove={(event) => {
-                // Back button is intentionally hidden most of the time.
-                // Only reveal it near the top-left hot area so it does not pollute the visual field.
                 const nearBackArea = event.clientX <= 120 && event.clientY <= 120;
-                if (nearBackArea !== showBackButton) {
-                    setShowBackButton(nearBackArea);
-                }
+                if (nearBackArea !== showBackButton) setShowBackButton(nearBackArea);
+
+                // tab 滑块热区：顶部中心区域
+                const containerWidth = (event.currentTarget as HTMLElement).clientWidth;
+                const nearTabArea = event.clientY <= 80 && Math.abs(event.clientX - containerWidth / 2) <= 120;
+                if (nearTabArea !== showTabSlider) setShowTabSlider(nearTabArea);
             }}
             onMouseLeave={() => {
-                if (showBackButton) {
-                    setShowBackButton(false);
-                }
+                if (showBackButton) setShowBackButton(false);
+                if (showTabSlider) setShowTabSlider(false);
             }}
         >
             {resolvedOnBack && (
                 <motion.button
                     type="button"
-                    aria-label={fromFullPlayerOverlay ? '返回经典模式' : t('ui.backToHome')}
-                    title={fromFullPlayerOverlay ? '返回经典模式' : t('ui.backToHome')}
+                    aria-label={fromFullPlayerOverlay ? '收起播放器' : t('ui.backToHome')}
+                    title={fromFullPlayerOverlay ? '收起播放器' : t('ui.backToHome')}
                     initial={false}
                     animate={{
                         opacity: showBackButton ? 1 : 0,
@@ -156,6 +167,47 @@ const VisualizerShell = forwardRef<HTMLDivElement, VisualizerShellProps>(({
                 >
                     <ChevronLeft size={20} />
                 </motion.button>
+            )}
+
+            {/* fromFullPlayerOverlay 模式下的 tab 滑块菜单，顶部中心热区独立触发 */}
+            {fromFullPlayerOverlay && resolvedOnPlayModeTabChange && resolvedPlayModeTab && (
+                <motion.div
+                    className="absolute top-6 left-1/2 -translate-x-1/2 z-30 flex items-center select-none rounded-full border border-white/10 bg-black/25 backdrop-blur-md p-0.5 pointer-events-auto"
+                    initial={false}
+                    animate={{
+                        opacity: showTabSlider ? 1 : 0,
+                        scale: showTabSlider ? 1 : 0.95,
+                        y: showTabSlider ? 0 : -4,
+                    }}
+                    transition={{ duration: 0.2, ease: 'easeOut' }}
+                    style={{ pointerEvents: showTabSlider ? 'auto' : 'none' }}
+                >
+                    <div
+                        className="absolute top-0.5 bottom-0.5 left-0.5 rounded-full bg-white/10 transition-transform duration-300 ease-[cubic-bezier(0.25,1,0.5,1)]"
+                        style={{
+                            width: '80px',
+                            transform: `translateX(${resolvedPlayModeTab === 'folia' ? '80px' : '0px'})`
+                        }}
+                    />
+                    <button
+                        type="button"
+                        onClick={() => resolvedOnPlayModeTabChange('classic')}
+                        className={`relative z-10 w-20 h-6 flex items-center justify-center rounded-full text-[11px] font-medium transition-colors cursor-pointer border-none bg-transparent ${
+                            resolvedPlayModeTab === 'classic' ? 'text-white font-semibold' : 'text-white/55 hover:text-white'
+                        }`}
+                    >
+                        经典
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => resolvedOnPlayModeTabChange('folia')}
+                        className={`relative z-10 w-20 h-6 flex items-center justify-center rounded-full text-[11px] font-medium transition-colors cursor-pointer border-none bg-transparent ${
+                            resolvedPlayModeTab === 'folia' ? 'text-white font-semibold' : 'text-white/55 hover:text-white'
+                        }`}
+                    >
+                        Folia
+                    </button>
+                </motion.div>
             )}
 
             <AnimatePresence>

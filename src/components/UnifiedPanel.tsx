@@ -704,7 +704,7 @@ const UnifiedPanel: React.FC<UnifiedPanelProps> = ({
                                                 }
                                             }}
                                             className="w-11 h-11 rounded-full border border-white/15 bg-black/25 text-white/90 backdrop-blur-md flex items-center justify-center transition-all hover:bg-black/40 hover:text-white"
-                                            title={fromFullPlayerOverlay ? '返回经典模式' : (t('ui.backToHome') || '返回主页')}
+                                            title={fromFullPlayerOverlay ? '收起播放器' : (t('ui.backToHome') || '返回主页')}
                                         >
                                             <HomeIcon size={18} />
                                         </button>
