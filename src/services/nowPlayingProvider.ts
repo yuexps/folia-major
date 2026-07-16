@@ -241,6 +241,7 @@ export class NowPlayingProvider {
     private readonly callbacks: NowPlayingProviderCallbacks;
     private readonly debug: boolean;
     private socket: WebSocket | null = null;
+    private broadcastChannel: BroadcastChannel | null = null;
     private reconnectTimer: number | null = null;
     private stopped = true;
     private lastPreciseProgressMs = 0;
@@ -360,6 +361,18 @@ export class NowPlayingProvider {
                 }
             }
             return;
+        } else {
+            // 独立标签页模式下，使用 BroadcastChannel 进行跨标签通信
+            this.updateConnectionStatus('connected');
+            this.broadcastChannel = new BroadcastChannel('2fmusic-folia-sync-channel');
+            this.broadcastChannel.onmessage = (event) => {
+                this.handlePostMessage(event);
+            };
+            // 独立页面载入时也触发一次 ready 询问宿主获取全量状态
+            try {
+                this.broadcastChannel.postMessage({ type: 'folia-ready' });
+            } catch (e) {}
+            return;
         }
 
         this.openSocket();
@@ -376,6 +389,11 @@ export class NowPlayingProvider {
             window.removeEventListener('message', this.handlePostMessage);
             if (hasOpener) {
                 window.removeEventListener('message', this.forwardToOpener);
+            }
+        } else {
+            if (this.broadcastChannel) {
+                this.broadcastChannel.close();
+                this.broadcastChannel = null;
             }
         }
 

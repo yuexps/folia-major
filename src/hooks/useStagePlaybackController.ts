@@ -207,6 +207,10 @@ export function useStagePlaybackController({
         startedAtMs: null,
         durationSec: 0,
     });
+    const lastSeekTimeRef = useRef<number>(0);
+    const recordLocalSeek = useCallback(() => {
+        lastSeekTimeRef.current = performance.now();
+    }, []);
     const nowPlayingProviderRef = useRef<NowPlayingProvider | null>(null);
     const nowPlayingContentLoadKeyRef = useRef<string | null>(null);
     const nowPlayingContentLoadRequestIdRef = useRef(0);
@@ -1220,6 +1224,9 @@ export function useStagePlaybackController({
                 }
             },
             onProgress: ({ progressMs, quality }) => {
+                if (performance.now() - lastSeekTimeRef.current < 1000) {
+                    return;
+                }
                 nowPlayingProgressMsRef.current = progressMs;
                 nowPlayingProgressQualityRef.current = quality;
 
@@ -1508,5 +1515,6 @@ export function useStagePlaybackController({
         leaveStagePlayback,
         interruptStagePlaybackForMainTransition,
         clearStagePlaybackSession,
+        recordLocalSeek,
     };
 }

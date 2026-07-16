@@ -61,6 +61,7 @@ import { useSessionRestoreController } from './hooks/useSessionRestoreController
 import { useStagePlaybackController } from './hooks/useStagePlaybackController';
 import { useSongThemeAutoGeneration } from './hooks/useSongThemeAutoGeneration';
 import { useThemeController } from './hooks/useThemeController';
+import { useFoliaHostBridge } from './hooks/useFoliaHostBridge';
 import { useThemeQuickEditorStore } from './stores/useThemeQuickEditorStore';
 import { useSearchNavigationStore } from './stores/useSearchNavigationStore';
 import { useSettingsUiStore } from './stores/useSettingsUiStore';
@@ -1281,27 +1282,31 @@ export default function App() {
         lastAudioRecoverySourceRef,
     });
 
-    const playSong = useCallback(async (song: SongResult, queue?: SongResult[], isFmCall?: boolean) => {
-        console.log('[Folia][iframe] playSong called, name:', song.name, 'fromFullPlayerOverlay:', fromFullPlayerOverlay);
-        if (fromFullPlayerOverlay && stageSource === 'now-playing') {
-            const hostSong = {
-                id: String(song.id),
-                title: song.name || '',
-                artist: song.ar?.map(a => a.name).join(', ') || song.artists?.map(a => a.name).join(', ') || '未知艺术家',
-                album: song.al?.name || song.album?.name || '',
-                album_art: song.al?.picUrl || song.album?.picUrl || '',
-                duration: Math.floor((song.dt || song.duration || 0) / 1000),
-                filename: (song as any).filename || '',
-                path: (song as any).path || '',
-                sourceType: (song as any).sourceType || 'cloud',
-                isNetease: (song as any).isNetease ?? false,
-                neteaseId: (song as any).neteaseId ?? null
-            };
-            window.parent.postMessage({ type: 'folia-play-song-external', data: { song: hostSong } }, '*');
-            return;
-        }
-        return playSongOriginal(song, queue, isFmCall);
-    }, [playSongOriginal, fromFullPlayerOverlay, stageSource]);
+    const {
+        wrappedCallbacks,
+        recordLocalSeek,
+        postToHost,
+    } = useFoliaHostBridge({
+        fromFullPlayerOverlay,
+        stageSource,
+        originalPlaySong: playSongOriginal,
+        originalNextTrack: handleNextTrackOriginal,
+        originalPrevTrack: handlePrevTrackOriginal,
+        originalShuffleQueue: shuffleQueueOriginal,
+        originalRemoveQueueSong: removeQueueSong,
+        originalMoveQueueSongToEnd: moveQueueSongToEnd,
+        originalMoveQueueSongToNext: moveQueueSongToNext,
+    });
+
+    const {
+        playSong,
+        handleNextTrack,
+        handlePrevTrack,
+        shuffleQueue,
+        removeQueueSong: handleRemoveQueueSong,
+        moveQueueSongToEnd: handleMoveQueueSongToEnd,
+        moveQueueSongToNext: handleMoveQueueSongToNext,
+    } = wrappedCallbacks;
 
     const handleLike = useCallback(async () => {
         if (fromFullPlayerOverlay && stageSource === 'now-playing' && currentSong) {
@@ -1317,33 +1322,6 @@ export default function App() {
         }
         return handleSetVolumeOriginal(nextVolume);
     }, [handleSetVolumeOriginal, fromFullPlayerOverlay, stageSource]);
-
-    const handleNextTrack = useCallback((options?: any) => {
-        console.log('[Folia][iframe] handleNextTrack called, fromFullPlayerOverlay:', fromFullPlayerOverlay);
-        if (fromFullPlayerOverlay) {
-            window.parent.postMessage({ type: 'folia-next' }, '*');
-            return;
-        }
-        return handleNextTrackOriginal(options);
-    }, [handleNextTrackOriginal, fromFullPlayerOverlay]);
-
-    const handlePrevTrack = useCallback(() => {
-        console.log('[Folia][iframe] handlePrevTrack called, fromFullPlayerOverlay:', fromFullPlayerOverlay);
-        if (fromFullPlayerOverlay) {
-            window.parent.postMessage({ type: 'folia-prev' }, '*');
-            return;
-        }
-        return handlePrevTrackOriginal();
-    }, [handlePrevTrackOriginal, fromFullPlayerOverlay]);
-
-    const shuffleQueue = useCallback(() => {
-        console.log('[Folia][iframe] shuffleQueue called, fromFullPlayerOverlay:', fromFullPlayerOverlay);
-        if (fromFullPlayerOverlay && stageSource === 'now-playing') {
-            window.parent.postMessage({ type: 'folia-shuffle-queue' }, '*');
-            return;
-        }
-        return shuffleQueueOriginal();
-    }, [shuffleQueueOriginal, fromFullPlayerOverlay, stageSource]);
 
     usePlaybackUiEffects({
         statusMsg,
@@ -2074,7 +2052,8 @@ export default function App() {
     });
     const seekMainAudio = useCallback((time: number) => {
         if (fromFullPlayerOverlay) {
-            window.parent.postMessage({ type: 'folia-seek', data: { positionMs: Math.round(time * 1000) } }, '*');
+            recordLocalSeek();
+            postToHost('folia-seek', { positionMs: Math.round(time * 1000) });
             return;
         }
         if (audioRef.current) {
@@ -2094,7 +2073,8 @@ export default function App() {
 
         const playbackTime = Math.max(0, lyricTimeSec + currentTime.get() - lyricCurrentTime.get());
         if (fromFullPlayerOverlay) {
-            window.parent.postMessage({ type: 'folia-seek', data: { positionMs: Math.round(playbackTime * 1000) } }, '*');
+            recordLocalSeek();
+            postToHost('folia-seek', { positionMs: Math.round(playbackTime * 1000) });
             return;
         }
         if (activePlaybackContext === 'stage' && stageActiveEntryKind === 'lyrics' && !audioSrc) {
@@ -2440,9 +2420,9 @@ export default function App() {
         playSong,
         queueScrollRef,
         shuffleQueue,
-        removeQueueSong,
-        moveQueueSongToEnd,
-        moveQueueSongToNext,
+        removeQueueSong: handleRemoveQueueSong,
+        moveQueueSongToEnd: handleMoveQueueSongToEnd,
+        moveQueueSongToNext: handleMoveQueueSongToNext,
         localPlaylists,
         playlists,
         saveCurrentQueueAsLocalPlaylist,
@@ -2637,9 +2617,9 @@ export default function App() {
         setTheme,
         showOpenPanelCloseButton,
         shuffleQueue,
-        removeQueueSong,
-        moveQueueSongToEnd,
-        moveQueueSongToNext,
+        handleRemoveQueueSong,
+        handleMoveQueueSongToEnd,
+        handleMoveQueueSongToNext,
         theme,
         themeSourceModel,
         toggleLoop,
