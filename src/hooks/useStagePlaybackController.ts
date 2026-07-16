@@ -1341,11 +1341,16 @@ export function useStagePlaybackController({
         }
 
         const nextContentLoadKey = buildNowPlayingContentLoadKey(nowPlayingTrack, nowPlayingLyricPayload);
-        if (!nextContentLoadKey || nowPlayingContentLoadKeyRef.current === nextContentLoadKey) {
+        if (nowPlayingContentLoadKeyRef.current === nextContentLoadKey) {
             return;
         }
 
         nowPlayingContentLoadKeyRef.current = nextContentLoadKey;
+        if (!nextContentLoadKey) {
+            clearPlaybackSurface();
+            return;
+        }
+
         const requestId = nowPlayingContentLoadRequestIdRef.current + 1;
         nowPlayingContentLoadRequestIdRef.current = requestId;
         void loadNowPlayingIntoPlayback(nowPlayingTrack, nowPlayingLyricPayload, requestId);

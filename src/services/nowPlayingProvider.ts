@@ -276,9 +276,7 @@ export class NowPlayingProvider {
                 ...this.snapshot,
                 track,
             };
-            if (track) {
-                this.callbacks.onTrack?.(track);
-            }
+            this.callbacks.onTrack?.(track);
         } else if (type === '2fmusic-lyric') {
             const lyric = normalizeNowPlayingLyricPayload(data);
             if (this.debug) {

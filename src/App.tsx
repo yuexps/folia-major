@@ -1284,7 +1284,20 @@ export default function App() {
     const playSong = useCallback(async (song: SongResult, queue?: SongResult[], isFmCall?: boolean) => {
         console.log('[Folia][iframe] playSong called, name:', song.name, 'fromFullPlayerOverlay:', fromFullPlayerOverlay);
         if (fromFullPlayerOverlay && stageSource === 'now-playing') {
-            window.parent.postMessage({ type: 'folia-play-song', data: { id: song.id } }, '*');
+            const hostSong = {
+                id: String(song.id),
+                title: song.name || '',
+                artist: song.ar?.map(a => a.name).join(', ') || song.artists?.map(a => a.name).join(', ') || '未知艺术家',
+                album: song.al?.name || song.album?.name || '',
+                album_art: song.al?.picUrl || song.album?.picUrl || '',
+                duration: Math.floor((song.dt || song.duration || 0) / 1000),
+                filename: (song as any).filename || '',
+                path: (song as any).path || '',
+                sourceType: (song as any).sourceType || 'cloud',
+                isNetease: (song as any).isNetease ?? false,
+                neteaseId: (song as any).neteaseId ?? null
+            };
+            window.parent.postMessage({ type: 'folia-play-song-external', data: { song: hostSong } }, '*');
             return;
         }
         return playSongOriginal(song, queue, isFmCall);
@@ -3126,14 +3139,14 @@ export default function App() {
                         </div>
                         <div className="mt-3 text-2xl font-semibold">
                             {fromFullPlayerOverlay
-                                ? '等待宿主播放歌曲'
+                                ? (playQueue.length > 0 ? '暂无正在播放的歌曲' : '播放列表为空')
                                 : (stageSource === 'now-playing'
                                     ? (t('options.stageSessionEmpty') || '等待本地 Now Playing 服务输入')
                                     : (t('options.stageSessionEmpty') || '等待外部输入'))}
                         </div>
                         <div className="mt-2 text-sm opacity-70">
                             {fromFullPlayerOverlay
-                                ? '请在 2FMusic 播放器中选择歌曲并播放'
+                                ? (playQueue.length > 0 ? '播放队列中已有可用歌曲，点击下方播放按钮或打开播放列表即可开始播放' : '请先在 2FMusic 播放器中选择歌曲并播放')
                                 : stageSource === 'now-playing'
                                     ? (nowPlayingConnectionStatus === 'error'
                                         ? (t('options.stageConnectionError') || '未能连接到 ws://localhost:9863/api/ws/lyric，请确认 now-playing 服务已在本机运行')
