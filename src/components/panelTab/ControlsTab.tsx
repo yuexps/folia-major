@@ -1,12 +1,14 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Repeat, Repeat1, RepeatOff, Heart, Sparkles, RotateCcw, Cone, Sun, Moon, Volume2, Volume1, VolumeX } from 'lucide-react';
+import { Repeat, Repeat1, RepeatOff, Heart, Sparkles, Sparkle, ArrowUpDown, Check, RefreshCw, Cone, Sun, Moon, Settings, Volume2, Volume1, VolumeX } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Theme, ThemeMode, VisualizerMode } from '../../types';
 import type { ThemeSourceModel } from '../../hooks/themeControllerState';
 import { getVisualizerModeLabel, VISUALIZER_REGISTRY } from '../visualizer/registry';
 import { useThemeQuickEditorStore } from '../../stores/useThemeQuickEditorStore';
 import { useSettingsUiStore } from '../../stores/useSettingsUiStore';
+import { syncNow } from '../../services/sync/syncCoordinator';
+import { isSyncConfigured } from '../../services/sync/syncConfig';
 
 // Controls tab keeps the visualizer picker local so it can expand into a full-tab overlay
 // without changing the rest of the player state flow.
@@ -25,7 +27,6 @@ interface ControlsTabProps {
     onBgModeChange: (mode: ThemeMode) => void;
     hasCustomTheme: boolean;
     themeSourceModel: ThemeSourceModel;
-    onResetTheme: () => void;
     defaultTheme: Theme;
     daylightTheme: Theme;
     visualizerMode: VisualizerMode;
@@ -57,7 +58,6 @@ const ControlsTab: React.FC<ControlsTabProps> = ({
     onBgModeChange,
     hasCustomTheme,
     themeSourceModel,
-    onResetTheme,
     defaultTheme,
     daylightTheme,
     visualizerMode,
@@ -77,12 +77,52 @@ const ControlsTab: React.FC<ControlsTabProps> = ({
     const { t } = useTranslation();
     const openThemeQuickEditor = useThemeQuickEditorStore(state => state.openEditor);
     const openSettings = useSettingsUiStore(state => state.openSettings);
+    const statusSetter = useSettingsUiStore(state => state.statusSetter);
+    const visualizerBackgroundMode = useSettingsUiStore(state => state.visualizerBackgroundMode);
+    const monetBackgroundTuning = useSettingsUiStore(state => state.monetBackgroundTuning);
+    const setMonetBackgroundTuning = useSettingsUiStore(state => state.handleSetMonetBackgroundTuning);
     const [sliderVolume, setSliderVolume] = useState(isMuted ? 0 : volume);
     const [isVisualizerOverlayOpen, setIsVisualizerOverlayOpen] = useState(false);
+    const [themeSyncState, setThemeSyncState] = useState<'idle' | 'syncing' | 'complete'>('idle');
     const isDraggingRef = useRef(false);
+    const themeSyncCompleteTimerRef = useRef<number | null>(null);
     const pendingVolumeRef = useRef(sliderVolume);
     const visualizerTriggerRef = useRef<HTMLButtonElement>(null);
     const [visualizerOverlayLeft, setVisualizerOverlayLeft] = useState(0);
+
+    useEffect(() => () => {
+        if (themeSyncCompleteTimerRef.current !== null) {
+            window.clearTimeout(themeSyncCompleteTimerRef.current);
+        }
+    }, []);
+
+    const handleThemeSync = async () => {
+        if (themeSyncState === 'syncing') return;
+
+        if (!isSyncConfigured()) {
+            statusSetter?.({
+                type: 'info',
+                text: t('commandPalette.syncNotConfigured'),
+            });
+            return;
+        }
+
+        if (themeSyncCompleteTimerRef.current !== null) {
+            window.clearTimeout(themeSyncCompleteTimerRef.current);
+        }
+        setThemeSyncState('syncing');
+        const result = await syncNow({ syncThemes: true, applyRemoteSettings: false, pushSettings: false });
+        if (!result) {
+            setThemeSyncState('idle');
+            return;
+        }
+
+        setThemeSyncState('complete');
+        themeSyncCompleteTimerRef.current = window.setTimeout(() => {
+            setThemeSyncState('idle');
+            themeSyncCompleteTimerRef.current = null;
+        }, 1600);
+    };
 
     useEffect(() => {
         if (!isDraggingRef.current) {
@@ -187,6 +227,9 @@ const ControlsTab: React.FC<ControlsTabProps> = ({
     const themeDisplayName = formatThemeDisplayName(activeThemeSource.label || theme.name);
     const aiSwatchColor = aiThemeSource.theme?.backgroundColor ?? 'rgba(114,119,134,0.4)';
     const customSwatchColor = customThemeSource.theme?.accentColor ?? 'rgba(114,119,134,0.4)';
+    const resolvedVisualizerBackgroundMode = visualizerBackgroundMode ?? (visualizerMode === 'monet' ? 'monet' : 'common');
+    const isMonetFullOverlay = monetBackgroundTuning.backgroundLayout === 'full-overlay';
+    const monetLayoutLabel = t(isMonetFullOverlay ? 'options.monetLayoutFullOverlay' : 'options.monetLayoutHalfPane');
     const openCurrentThemeQuickEditor = () => {
         if (currentEditableSource) {
             openThemeQuickEditor(currentEditableSource);
@@ -219,9 +262,17 @@ const ControlsTab: React.FC<ControlsTabProps> = ({
                     <button
                         onClick={onGenerateAITheme}
                         disabled={isGeneratingTheme || !canGenerateAITheme}
-                        className={`h-12 rounded-xl flex items-center justify-center transition-colors ${isGeneratingTheme ? 'bg-blue-500/20 text-blue-300' : buttonBg}`}
+                        className={`h-12 rounded-xl flex items-center justify-center transition-colors ${
+                            isGeneratingTheme
+                                ? 'bg-blue-500/20 text-blue-300'
+                                : buttonBg
+                        }`}
                     >
-                        <Sparkles size={20} className={isGeneratingTheme ? 'animate-pulse' : ''} />
+                        {themeSourceModel.hasLocalAiTheme && !isGeneratingTheme ? (
+                            <Sparkles size={20} />
+                        ) : (
+                            <Sparkle size={20} className={isGeneratingTheme ? 'animate-pulse' : ''} />
+                        )}
                     </button>
                 </div>
 
@@ -264,17 +315,31 @@ const ControlsTab: React.FC<ControlsTabProps> = ({
                     </div>
 
                     <div className="flex items-center justify-between">
-                        <button
-                            type="button"
-                            onClick={() => {
-                                openSettings('options', 'visualizer');
-                                onClosePanel?.();
-                            }}
-                            className="text-[10px] font-bold opacity-40 hover:opacity-100 transition-opacity uppercase tracking-widest text-left"
-                            title={t('ui.openVisualizerSettings') || 'Open Visualizer Settings'}
-                        >
-                            {t('ui.animationMode') || '歌词样式'}
-                        </button>
+                        <div className="flex items-center gap-0.5">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    openSettings('options', 'visualizer', 'common');
+                                    onClosePanel?.();
+                                }}
+                                className="text-[10px] font-bold opacity-40 hover:opacity-100 transition-opacity uppercase tracking-widest text-left"
+                                title={t('ui.openVisualizerSettings') || 'Open Visualizer Settings'}
+                            >
+                                {t('ui.animationMode')}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    openSettings('options', 'visualizer', 'visualizer');
+                                    onClosePanel?.();
+                                }}
+                                className="rounded-md p-1 opacity-40 transition-opacity hover:opacity-100"
+                                title={t('options.openLyricsStyleSettings')}
+                                aria-label={t('options.openLyricsStyleSettings')}
+                            >
+                                <Settings size={13} />
+                            </button>
+                        </div>
                         <div className="flex items-center gap-2">
                             <button
                                 ref={visualizerTriggerRef}
@@ -297,9 +362,31 @@ const ControlsTab: React.FC<ControlsTabProps> = ({
 
                     <div>
                         <div className="flex items-center justify-between mb-2">
-                            <label className="text-[10px] font-bold opacity-40 uppercase tracking-widest">
-                                {t('ui.background')}
-                            </label>
+                            <div className="flex items-center gap-0.5">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        openSettings('options', 'visualizer', 'background');
+                                        onClosePanel?.();
+                                    }}
+                                    className="text-[10px] font-bold opacity-40 uppercase tracking-widest transition-opacity hover:opacity-100"
+                                    title={t('options.previewBackgroundSettings')}
+                                >
+                                    {t('ui.background')}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        openSettings('options', 'visualizer', 'background');
+                                        onClosePanel?.();
+                                    }}
+                                    className="rounded-md p-1 opacity-40 transition-opacity hover:opacity-100"
+                                    title={t('options.previewBackgroundSettings')}
+                                    aria-label={t('options.previewBackgroundSettings')}
+                                >
+                                    <Settings size={13} />
+                                </button>
+                            </div>
                             <div className="flex items-center gap-1">
                                 <button
                                     onClick={onToggleDaylight}
@@ -308,13 +395,27 @@ const ControlsTab: React.FC<ControlsTabProps> = ({
                                 >
                                     {isDaylight ? <Sun size={14} /> : <Moon size={14} />}
                                 </button>
-                                <button
-                                    onClick={() => onToggleCoverColorBg(!useCoverColorBg)}
-                                    className={`p-1 rounded-md transition-all ${useCoverColorBg ? 'text-blue-400' : 'opacity-40 hover:opacity-100'}`}
-                                    title={useCoverColorBg ? t('theme.addCoverColor') : t('theme.useDefaultColor')}
-                                >
-                                    <Cone size={14} />
-                                </button>
+                                {resolvedVisualizerBackgroundMode === 'common' && (
+                                    <button
+                                        onClick={() => onToggleCoverColorBg(!useCoverColorBg)}
+                                        className={`p-1 rounded-md transition-all ${useCoverColorBg ? 'text-blue-400' : 'opacity-40 hover:opacity-100'}`}
+                                        title={useCoverColorBg ? t('theme.addCoverColor') : t('theme.useDefaultColor')}
+                                    >
+                                        <Cone size={14} />
+                                    </button>
+                                )}
+                                {resolvedVisualizerBackgroundMode === 'monet' && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setMonetBackgroundTuning({ backgroundLayout: isMonetFullOverlay ? 'half-pane-gradient' : 'full-overlay' })}
+                                        className={`rounded-md px-1.5 py-1 text-[10px] font-bold transition-all ${activeOptionBg}`}
+                                        title={`${t('options.monetBackgroundLayout')}: ${monetLayoutLabel}`}
+                                        aria-label={`${t('options.monetBackgroundLayout')}: ${monetLayoutLabel}`}
+                                        aria-pressed={isMonetFullOverlay}
+                                    >
+                                        {monetLayoutLabel}
+                                    </button>
+                                )}
                             </div>
                         </div>
                         <div className={`flex ${wellBg} p-1 rounded-xl`}>
@@ -366,11 +467,33 @@ const ControlsTab: React.FC<ControlsTabProps> = ({
                         )}
                         {themeSourceModel.activeSource !== 'default' && (
                             <button
-                                onClick={onResetTheme}
-                                className={`p-1 rounded-full ${isDaylight ? 'hover:bg-black/10' : 'hover:bg-white/10'} transition-colors`}
-                                title={t('ui.resetToDefaultTheme')}
+                                onClick={() => void handleThemeSync()}
+                                disabled={themeSyncState === 'syncing'}
+                                className={`p-1 rounded-full ${isDaylight ? 'hover:bg-black/10' : 'hover:bg-white/10'} transition-colors disabled:cursor-wait`}
+                                title={themeSyncState === 'syncing'
+                                    ? t('options.syncing')
+                                    : themeSyncState === 'complete'
+                                        ? t('ui.synced')
+                                        : t('commandPalette.commands.sync-now.title')}
                             >
-                                <RotateCcw size={12} />
+                                <AnimatePresence mode="wait" initial={false}>
+                                    <motion.span
+                                        key={themeSyncState}
+                                        initial={{ opacity: 0, scale: 0.55, rotate: -35 }}
+                                        animate={{ opacity: 1, scale: 1, rotate: 0 }}
+                                        exit={{ opacity: 0, scale: 0.55, rotate: 35 }}
+                                        transition={{ duration: 0.16, ease: 'easeOut' }}
+                                        className="block"
+                                    >
+                                        {themeSyncState === 'syncing' ? (
+                                            <RefreshCw size={12} className="animate-spin" />
+                                        ) : themeSyncState === 'complete' ? (
+                                            <Check size={12} className="text-green-500" strokeWidth={3} />
+                                        ) : (
+                                            <ArrowUpDown size={12} />
+                                        )}
+                                    </motion.span>
+                                </AnimatePresence>
                             </button>
                         )}
                     </div>

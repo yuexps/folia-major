@@ -8,6 +8,7 @@ import {
     type CadenzaTuning,
     type ClassicTuning,
     type CladdaghTuning,
+    type DioramaTuning,
     type FumeTuning,
     type Line,
     type MonetBackgroundImage,
@@ -21,10 +22,11 @@ import {
     type VisualizerBackgroundMode,
     type VisualizerMode,
 } from '../../types';
+import type { VisualizerTuningBundle } from './tuningRegistry';
 
 // src/components/visualizer/definition.ts
 // Shared contracts for discoverable visualizer modes.
-export type VisualizerTuningKind = 'none' | 'classic' | 'cadenza' | 'partita' | 'fume' | 'claddagh' | 'cappella' | 'tilt' | 'monet';
+export type VisualizerTuningKind = 'none' | 'classic' | 'cadenza' | 'partita' | 'fume' | 'claddagh' | 'cappella' | 'tilt' | 'monet' | 'diorama';
 
 export interface VisualizerSharedProps {
     currentTime: MotionValue<number>;
@@ -61,6 +63,7 @@ export interface VisualizerSharedProps {
     playModeTab?: 'classic' | 'folia';
     onLyricLineSeek?: (lyricTimeSec: number) => void;
     isPreviewMode?: boolean;
+    visualizerTunings?: VisualizerTuningBundle;
     classicTuning?: ClassicTuning;
     cadenzaTuning?: CadenzaTuning;
     partitaTuning?: PartitaTuning;
@@ -71,6 +74,7 @@ export interface VisualizerSharedProps {
     cappellaCustomEmojiImages?: CappellaEmojiImage[];
     cappellaCustomAvatarImages?: CappellaAvatarImage[];
     tiltTuning?: TiltTuning;
+    dioramaTuning?: DioramaTuning;
     monetBackgroundTuning?: MonetBackgroundTuning;
     monetTuning?: MonetTuning;
     monetBackgroundImage?: MonetBackgroundImage | null;
@@ -109,6 +113,8 @@ export interface VisualizerSettingsPanelProps {
     isCappellaCustomAvatarLoading?: boolean;
     tiltTuning?: TiltTuning;
     onTiltTuningChange?: (patch: Partial<TiltTuning>) => void;
+    dioramaTuning?: DioramaTuning;
+    onDioramaTuningChange?: (patch: Partial<DioramaTuning>) => void;
     monetTuning?: MonetTuning;
     onMonetTuningChange?: (patch: Partial<MonetTuning>) => void;
     monetBackgroundImage?: MonetBackgroundImage | null;
@@ -140,6 +146,7 @@ export interface VisualizerSettingsResetProps {
     resetCladdaghTuning?: () => void;
     resetCappellaTuning?: () => void;
     resetTiltTuning?: () => void;
+    resetDioramaTuning?: () => void;
     resetMonetTuning?: () => void;
     setDraftFumeTuning?: (tuning: FumeTuning) => void;
     setDraftCladdaghTuning?: (tuning: CladdaghTuning) => void;

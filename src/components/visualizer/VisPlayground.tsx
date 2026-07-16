@@ -9,6 +9,7 @@ import {
     DEFAULT_CAPPELLA_TUNING,
     DEFAULT_CLASSIC_TUNING,
     DEFAULT_CLADDAGH_TUNING,
+    DEFAULT_DIORAMA_TUNING,
     DEFAULT_FUME_TUNING,
     DEFAULT_MONET_BACKGROUND_TUNING,
     DEFAULT_MONET_TUNING,
@@ -30,6 +31,7 @@ import {
     type StoredCustomLyricsFont,
     type Theme,
     type TiltTuning,
+    type DioramaTuning,
     type UrlBackgroundItem,
     type VisualizerBackgroundMode,
     type VisualizerMode,
@@ -52,6 +54,7 @@ interface VisPlaygroundProps {
     theme?: Theme;
     isDaylight: boolean;
     visualizerMode: VisualizerMode;
+    initialEditSection?: VisPlaygroundEditSection;
     backgroundOpacity?: number;
     visualizerOpacity?: number;
     useCoverColorBg?: boolean;
@@ -70,6 +73,7 @@ interface VisPlaygroundProps {
     claddaghTuning?: CladdaghTuning;
     cappellaTuning?: CappellaTuning;
     tiltTuning?: TiltTuning;
+    dioramaTuning?: DioramaTuning;
     monetBackgroundTuning?: MonetBackgroundTuning;
     monetTuning?: MonetTuning;
     cappellaCustomEmojiImages?: CappellaEmojiImage[];
@@ -119,6 +123,8 @@ interface VisPlaygroundProps {
     onResetCappellaTuning?: () => void;
     onTiltTuningChange?: (patch: Partial<TiltTuning>) => void;
     onResetTiltTuning?: () => void;
+    onDioramaTuningChange?: (patch: Partial<DioramaTuning>) => void;
+    onResetDioramaTuning?: () => void;
     onMonetBackgroundTuningChange?: (patch: Partial<MonetBackgroundTuning>) => void;
     onResetMonetBackgroundTuning?: () => void;
     onMonetTuningChange?: (patch: Partial<MonetTuning>) => void;
@@ -192,6 +198,7 @@ const clampFumeTextHoldRatio = (value: number) => Math.min(1, Math.max(0, value)
 const clampCladdaghFocusScaleRatio = (val: number) => Math.min(1.5, Math.max(0.0, val));
 const clampCladdaghRadiusScale = (val: number) => Math.min(1.5, Math.max(0.5, val));
 const clampCladdaghEllipseTiltDeg = (val: number) => Math.min(60, Math.max(0, val));
+const clampCladdaghLetterSpacingOffset = (val: number) => Math.min(20, Math.max(-5, val));
 const isMobileBrowser = () => {
     if (typeof navigator === 'undefined') {
         return false;
@@ -268,6 +275,7 @@ const VisPlayground: React.FC<VisPlaygroundProps> = ({
     theme,
     isDaylight,
     visualizerMode,
+    initialEditSection = 'common',
     backgroundOpacity = 0.75,
     visualizerOpacity = 1,
     useCoverColorBg = false,
@@ -286,6 +294,7 @@ const VisPlayground: React.FC<VisPlaygroundProps> = ({
     claddaghTuning = DEFAULT_CLADDAGH_TUNING,
     cappellaTuning = DEFAULT_CAPPELLA_TUNING,
     tiltTuning = DEFAULT_TILT_TUNING,
+    dioramaTuning = DEFAULT_DIORAMA_TUNING,
     monetBackgroundTuning = DEFAULT_MONET_BACKGROUND_TUNING,
     monetTuning = DEFAULT_MONET_TUNING,
     cappellaCustomEmojiImages = [],
@@ -333,6 +342,8 @@ const VisPlayground: React.FC<VisPlaygroundProps> = ({
     onResetCappellaTuning,
     onTiltTuningChange,
     onResetTiltTuning,
+    onDioramaTuningChange,
+    onResetDioramaTuning,
     onMonetBackgroundTuningChange,
     onResetMonetBackgroundTuning,
     onMonetTuningChange,
@@ -385,9 +396,10 @@ const VisPlayground: React.FC<VisPlaygroundProps> = ({
     const [draftFumeTuning, setDraftFumeTuning] = useState<FumeTuning>(fumeTuning);
     const [draftCladdaghTuning, setDraftCladdaghTuning] = useState<CladdaghTuning>(claddaghTuning);
     const [draftTiltTuning, setDraftTiltTuning] = useState<TiltTuning>(tiltTuning);
+    const [draftDioramaTuning, setDraftDioramaTuning] = useState<DioramaTuning>(dioramaTuning);
     const [draftMonetBackgroundTuning, setDraftMonetBackgroundTuning] = useState<MonetBackgroundTuning>(monetBackgroundTuning);
     const [draftMonetTuning, setDraftMonetTuning] = useState<MonetTuning>(monetTuning);
-    const [activeEditSection, setActiveEditSection] = useState<VisPlaygroundEditSection>('common');
+    const [activeEditSection, setActiveEditSection] = useState<VisPlaygroundEditSection>(initialEditSection);
     const fontListRef = React.useRef<HTMLDivElement>(null);
     const fontVirtualListRef = useListRef(null);
     const fontUploadInputRef = React.useRef<HTMLInputElement>(null);
@@ -405,9 +417,9 @@ const VisPlayground: React.FC<VisPlaygroundProps> = ({
 
     const normalizedFontScale = clampFontScale(draftFontScale);
     const builtinFontOptions: PresetOption<Theme['fontStyle']>[] = useMemo(() => ([
-        { value: 'sans', label: t('options.fontSans') || '无衬线' },
-        { value: 'serif', label: t('options.fontSerif') || '衬线' },
-        { value: 'mono', label: t('options.fontMono') || '等宽' },
+        { value: 'sans', label: t('options.fontSans') },
+        { value: 'serif', label: t('options.fontSerif') },
+        { value: 'mono', label: t('options.fontMono') },
     ]), [t]);
     const baseTheme = theme ?? PREVIEW_THEME;
     const previewTheme = useMemo<Theme>(() => ({
@@ -433,6 +445,8 @@ const VisPlayground: React.FC<VisPlaygroundProps> = ({
         subtitleFontInheritsLyrics,
         subtitleFontStyle,
     ]);
+    const activePickerFontFamily = fontPickerTarget === 'subtitle' ? subtitleFontFamily : customFontFamily;
+    const activePickerTheme = fontPickerTarget === 'subtitle' ? previewSubtitleTheme : previewTheme;
     const resolvedPartitaTuning = useMemo<PartitaTuning>(() => {
         const rawMin = clampPartitaStagger(draftPartitaTuning.staggerMin ?? DEFAULT_PARTITA_TUNING.staggerMin);
         const rawMax = clampPartitaStagger(draftPartitaTuning.staggerMax ?? DEFAULT_PARTITA_TUNING.staggerMax);
@@ -466,13 +480,28 @@ const VisPlayground: React.FC<VisPlaygroundProps> = ({
         ellipseTiltDeg: clampCladdaghEllipseTiltDeg(
             draftCladdaghTuning.ellipseTiltDeg ?? DEFAULT_CLADDAGH_TUNING.ellipseTiltDeg
         ),
+        showAxisLine: draftCladdaghTuning.showAxisLine ?? DEFAULT_CLADDAGH_TUNING.showAxisLine,
+        letterSpacingOffset: clampCladdaghLetterSpacingOffset(
+            draftCladdaghTuning.letterSpacingOffset ?? DEFAULT_CLADDAGH_TUNING.letterSpacingOffset
+        ),
     }), [draftCladdaghTuning]);
-    const currentFontLabel = customFontLabel || customFontFamily || (t('options.customFont') || '自定义字体');
+    const draftVisualizerTunings = useMemo(() => ({
+        classic: draftClassicTuning,
+        cadenza: cadenzaTuning,
+        partita: resolvedPartitaTuning,
+        fume: resolvedFumeTuning,
+        claddagh: resolvedCladdaghTuning,
+        cappella: cappellaTuning,
+        tilt: draftTiltTuning,
+        diorama: draftDioramaTuning,
+        monet: draftMonetTuning,
+    }), [cadenzaTuning, cappellaTuning, draftClassicTuning, draftDioramaTuning, draftMonetTuning, draftTiltTuning, resolvedCladdaghTuning, resolvedFumeTuning, resolvedPartitaTuning]);
+    const currentFontLabel = customFontLabel || customFontFamily || t('options.customFont');
     const fontStyleOptions: PresetOption<Theme['fontStyle'] | 'custom'>[] = useMemo(() => ([
         ...builtinFontOptions,
         { value: 'custom', label: currentFontLabel },
     ]), [builtinFontOptions, currentFontLabel]);
-    const currentSubtitleFontLabel = subtitleFontFamily || (t('options.customFont') || '自定义字体');
+    const currentSubtitleFontLabel = subtitleFontFamily || t('options.customFont');
     const subtitleFontStyleOptions: PresetOption<Theme['fontStyle'] | 'custom'>[] = useMemo(() => ([
         ...builtinFontOptions,
         { value: 'custom', label: currentSubtitleFontLabel },
@@ -497,8 +526,10 @@ const VisPlayground: React.FC<VisPlaygroundProps> = ({
     useEffect(() => { setDraftFumeTuning(fumeTuning); }, [fumeTuning]);
     useEffect(() => { setDraftCladdaghTuning(claddaghTuning); }, [claddaghTuning]);
     useEffect(() => { setDraftTiltTuning(tiltTuning); }, [tiltTuning]);
+    useEffect(() => { setDraftDioramaTuning(dioramaTuning); }, [dioramaTuning]);
     useEffect(() => { setDraftMonetBackgroundTuning(monetBackgroundTuning); }, [monetBackgroundTuning]);
     useEffect(() => { setDraftMonetTuning(monetTuning); }, [monetTuning]);
+    useEffect(() => { setActiveEditSection(initialEditSection); }, [initialEditSection]);
 
     useEffect(() => {
         let frameId = 0;
@@ -547,9 +578,9 @@ const VisPlayground: React.FC<VisPlaygroundProps> = ({
     const visualizerEntry = getVisualizerRegistryEntry(visualizerMode);
     const modeLabel = getVisualizerModeLabel(visualizerMode, t);
     const hotspotLabels = useMemo<Record<Exclude<VisPlaygroundEditSection, 'common'>, string>>(() => ({
-        background: t('options.previewBackgroundHotspot') || '背景设置',
-        visualizer: t('options.previewVisualizerHotspot') || '歌词动画设置',
-        subtitle: t('options.previewSubtitleHotspot') || '字幕设置',
+        background: t('options.previewBackgroundHotspot'),
+        visualizer: t('options.previewVisualizerHotspot'),
+        subtitle: t('options.previewSubtitleHotspot'),
     }), [t]);
     const glassBg = isDaylight ? 'bg-white/70' : 'bg-zinc-950/88';
     const borderColor = isDaylight ? 'border-black/5' : 'border-white/10';
@@ -572,6 +603,7 @@ const VisPlayground: React.FC<VisPlaygroundProps> = ({
             resetCladdaghTuning: onResetCladdaghTuning,
             resetCappellaTuning: onResetCappellaTuning,
             resetTiltTuning: onResetTiltTuning,
+            resetDioramaTuning: onResetDioramaTuning,
             resetMonetTuning: onResetMonetTuning,
             setDraftFumeTuning,
             setDraftCladdaghTuning,
@@ -597,7 +629,7 @@ const VisPlayground: React.FC<VisPlaygroundProps> = ({
                 return;
             }
 
-            setFontPickerError(t('options.systemFontUnsupported') || '当前环境无法读取本机字体。');
+            setFontPickerError(t('options.systemFontUnsupported'));
             return;
         }
 
@@ -607,14 +639,14 @@ const VisPlayground: React.FC<VisPlaygroundProps> = ({
             const nextFonts = dedupeLocalFonts(fonts);
             setSystemFonts(nextFonts);
             if (nextFonts.length === 0) {
-                setFontPickerError(t('options.systemFontEmpty') || '没有读取到可用字体。');
+                setFontPickerError(t('options.systemFontEmpty'));
             }
         } catch (error) {
             console.error('[VisPlayground] Failed to query local fonts:', error);
             setFontPickerError(
                 error instanceof Error && error.message
                     ? error.message
-                    : (t('options.systemFontPermissionDenied') || '读取本机字体失败，请检查权限。')
+                    : t('options.systemFontPermissionDenied')
             );
         } finally {
             setIsLoadingSystemFonts(false);
@@ -648,7 +680,7 @@ const VisPlayground: React.FC<VisPlaygroundProps> = ({
             if (result.ok) {
                 setIsFontPickerOpen(false);
             } else {
-                setFontPickerError(result.error || (t('options.uploadFontFailed') || '上传字体失败。'));
+                setFontPickerError(result.error || (t('options.uploadFontFailed')));
             }
         } finally {
             setIsUploadingCustomFont(false);
@@ -686,7 +718,7 @@ const VisPlayground: React.FC<VisPlaygroundProps> = ({
         ariaAttributes: { "aria-posinset": number; "aria-setsize": number; role: "listitem"; };
     }) => {
         const font = filteredSystemFonts[index];
-        const isActive = customFontFamily?.toLocaleLowerCase() === font.family.toLocaleLowerCase();
+        const isActive = activePickerFontFamily?.toLocaleLowerCase() === font.family.toLocaleLowerCase();
 
         return (
             <div style={style} {...ariaAttributes}>
@@ -708,7 +740,7 @@ const VisPlayground: React.FC<VisPlaygroundProps> = ({
                         className="text-lg font-medium"
                         style={{
                             fontFamily: resolveThemeFontStack({
-                                fontStyle,
+                                fontStyle: activePickerTheme.fontStyle,
                                 fontFamily: font.family,
                             }),
                         }}
@@ -721,7 +753,7 @@ const VisPlayground: React.FC<VisPlaygroundProps> = ({
                 </button>
             </div>
         );
-    }, [customFontFamily, filteredSystemFonts, fontStyle, handleChooseSystemFont, isDaylight]);
+    }, [activePickerFontFamily, activePickerTheme.fontStyle, filteredSystemFonts, handleChooseSystemFont, isDaylight]);
 
     const handleSelectFontStyle = (next: Theme['fontStyle'] | 'custom') => {
         if (next === 'custom') {
@@ -812,6 +844,15 @@ const VisPlayground: React.FC<VisPlaygroundProps> = ({
             onTiltTuningChange?.(patch);
         } else {
             pendingCommitRef.current = () => onTiltTuningChange?.(patch);
+        }
+    };
+
+    const handleDioramaTuningDraft = (patch: Partial<DioramaTuning>) => {
+        setDraftDioramaTuning(prev => ({ ...prev, ...patch }));
+        if (!isDraggingSlider.current) {
+            onDioramaTuningChange?.(patch);
+        } else {
+            pendingCommitRef.current = () => onDioramaTuningChange?.(patch);
         }
     };
 
@@ -910,7 +951,7 @@ const VisPlayground: React.FC<VisPlaygroundProps> = ({
                         </button>
                         <div className="min-w-0">
                             <div className="text-lg sm:text-xl font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
-                                {t('options.lyricsStyleSettings') || '歌词样式'}
+                                {t('options.lyricsStyleSettings')}
                             </div>
                         </div>
                     </div>
@@ -920,7 +961,7 @@ const VisPlayground: React.FC<VisPlaygroundProps> = ({
                     <div className="relative min-h-[320px] overflow-hidden rounded-[28px] border border-white/10 bg-black/20">
                         <div className="absolute left-4 top-4 z-20 inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/25 px-3 py-1.5 text-xs uppercase tracking-[0.22em] backdrop-blur-md" style={{ color: 'rgba(255,255,255,0.78)' }}>
                             <Sparkles size={13} />
-                            <span>{t('ui.livePreview') || '实时预览'}</span>
+                            <span>{t('ui.livePreview')}</span>
                         </div>
                         <div className="absolute right-4 top-4 z-20 rounded-full border border-white/10 bg-black/25 px-3 py-1.5 text-xs backdrop-blur-md" style={{ color: 'rgba(255,255,255,0.78)' }}>
                             {modeLabel}
@@ -953,15 +994,8 @@ const VisPlayground: React.FC<VisPlaygroundProps> = ({
                                 subtitleOverlayOpacity={draftSubtitleOverlayOpacity}
                                 hideTranslationSubtitle={hideTranslationSubtitle}
                                 showSubtitleTranslation={showSubtitleTranslation}
-                                classicTuning={draftClassicTuning}
-                                cadenzaTuning={cadenzaTuning}
-                                partitaTuning={resolvedPartitaTuning}
-                                fumeTuning={resolvedFumeTuning}
-                                claddaghTuning={resolvedCladdaghTuning}
-                                cappellaTuning={cappellaTuning}
-                                tiltTuning={draftTiltTuning}
+                                visualizerTunings={draftVisualizerTunings}
                                 monetBackgroundTuning={draftMonetBackgroundTuning}
-                                monetTuning={draftMonetTuning}
                                 onMonetTuningChange={handleMonetTuningDraft}
                                 cappellaCustomEmojiImages={cappellaCustomEmojiImages}
                                 cappellaCustomAvatarImages={cappellaCustomAvatarImages}
@@ -1034,6 +1068,8 @@ const VisPlayground: React.FC<VisPlaygroundProps> = ({
                         isLoadingCappellaCustomAvatarPack={isLoadingCappellaCustomAvatarPack}
                         tiltTuning={draftTiltTuning}
                         onTiltTuningChange={handleTiltTuningDraft}
+                        dioramaTuning={draftDioramaTuning}
+                        onDioramaTuningChange={handleDioramaTuningDraft}
                         monetBackgroundTuning={draftMonetBackgroundTuning}
                         onMonetBackgroundTuningChange={handleMonetBackgroundTuningDraft}
                         monetTuning={draftMonetTuning}
@@ -1081,13 +1117,13 @@ const VisPlayground: React.FC<VisPlaygroundProps> = ({
                                 <div className="min-w-0">
                                     <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
                                         {shouldShowUploadedFontFallback
-                                            ? (t('options.uploadCustomFont') || '上传自定义字体')
-                                            : (t('options.chooseSystemFont') || '选择自定义字体')}
+                                            ? t('options.uploadCustomFont')
+                                            : t('options.chooseSystemFont')}
                                     </div>
                                     <div className="text-xs opacity-50 mt-1" style={{ color: 'var(--text-secondary)' }}>
                                         {shouldShowUploadedFontFallback
-                                            ? (t('options.uploadCustomFontDesc') || '当前移动浏览器无法读取系统字体，可上传一个字体文件作为 fallback。')
-                                            : (t('options.chooseSystemFontDesc') || '从当前系统已安装字体中选择一个字体。')}
+                                            ? (t('options.uploadCustomFontDesc'))
+                                            : (t('options.chooseSystemFontDesc'))}
                                     </div>
                                 </div>
                                 <button
@@ -1108,7 +1144,7 @@ const VisPlayground: React.FC<VisPlaygroundProps> = ({
                                             type="text"
                                             value={fontSearchQuery}
                                             onChange={(event) => setFontSearchQuery(event.target.value)}
-                                            placeholder={t('options.searchSystemFont') || '搜索字体'}
+                                            placeholder={t('options.searchSystemFont')}
                                             className="w-full bg-transparent text-sm outline-none placeholder:opacity-40"
                                             style={{ color: 'var(--text-primary)' }}
                                         />
@@ -1128,26 +1164,26 @@ const VisPlayground: React.FC<VisPlaygroundProps> = ({
                                         />
                                         <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
                                             <div className="text-xs opacity-50" style={{ color: 'var(--text-secondary)' }}>
-                                                {t('options.currentFont') || '当前字体'}
+                                                {t('options.currentFont')}
                                             </div>
                                             <div className="mt-1 text-base font-medium" style={{ color: 'var(--text-primary)' }}>
                                                 {fontPickerTarget === 'subtitle'
-                                                    ? (subtitleFontFamily || (t('options.systemFontInactive') || '未启用'))
+                                                    ? (subtitleFontFamily || t('options.systemFontInactive'))
                                                     : (customFontFamily
                                                         ? currentFontLabel
-                                                        : (t('options.systemFontInactive') || '未启用'))}
+                                                        : t('options.systemFontInactive'))}
                                             </div>
                                             <div className="mt-1 text-xs opacity-50" style={{ color: 'var(--text-secondary)' }}>
                                                 {fontPickerTarget === 'subtitle'
-                                                    ? (subtitleFontFallbackFamilies.length > 0 ? subtitleFontFallbackFamilies.join(', ') : (t('options.fontFallbackEmpty') || '未设置备用字体'))
-                                                    : (fontFallbackFamilies.length > 0 ? fontFallbackFamilies.join(', ') : (t('options.fontFallbackEmpty') || '未设置备用字体'))}
+                                                    ? (subtitleFontFallbackFamilies.length > 0 ? subtitleFontFallbackFamilies.join(', ') : t('options.fontFallbackEmpty'))
+                                                    : (fontFallbackFamilies.length > 0 ? fontFallbackFamilies.join(', ') : t('options.fontFallbackEmpty'))}
                                             </div>
                                         </div>
                                         <FontFallbackStackControl
-                                            label={t('options.fontFallbackFamilies') || '备用字体'}
+                                            label={t('options.fontFallbackFamilies')}
                                             value={fontPickerTarget === 'subtitle' ? subtitleFontFallbackFamilies : fontFallbackFamilies}
                                             onChange={fontPickerTarget === 'subtitle' ? onSubtitleFontFallbackFamiliesChange : onFontFallbackFamiliesChange}
-                                            theme={previewTheme}
+                                            theme={activePickerTheme}
                                             placeholder={t('options.fontFallbackFamiliesPlaceholder') || 'Songti SC, SimSun, serif'}
                                         />
                                         {fontPickerError && (
@@ -1167,10 +1203,10 @@ const VisPlayground: React.FC<VisPlaygroundProps> = ({
                                                 <Upload size={17} />
                                             )}
                                             {isUploadingCustomFont
-                                                ? (t('options.uploadingCustomFont') || '上传中...')
-                                                : (t('options.uploadCustomFont') || '上传自定义字体')}
+                                                ? (t('options.uploadingCustomFont'))
+                                                : t('options.uploadCustomFont')}
                                         </button>
-                                        {customFontFamily && (
+                                        {activePickerFontFamily && (
                                             <button
                                                 type="button"
                                                 onClick={() => {
@@ -1184,14 +1220,14 @@ const VisPlayground: React.FC<VisPlaygroundProps> = ({
                                                 className="flex h-11 w-full items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 text-sm font-medium transition hover:bg-white/10"
                                                 style={{ color: 'var(--text-primary)' }}
                                             >
-                                                {t('options.clearSystemFont') || '恢复内置字体'}
+                                                {t('options.clearSystemFont')}
                                             </button>
                                         )}
                                     </div>
                                 ) : isLoadingSystemFonts ? (
                                     <div className="h-full flex items-center justify-center text-sm gap-3" style={{ color: 'var(--text-secondary)' }}>
                                         <Loader2 size={18} className="animate-spin" />
-                                        <span>{t('options.loadingSystemFonts') || '正在读取系统字体...'}</span>
+                                        <span>{t('options.loadingSystemFonts')}</span>
                                     </div>
                                 ) : fontPickerError ? (
                                     <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm leading-6" style={{ color: 'var(--text-secondary)' }}>
@@ -1199,32 +1235,32 @@ const VisPlayground: React.FC<VisPlaygroundProps> = ({
                                     </div>
                                 ) : filteredSystemFonts.length === 0 ? (
                                     <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm leading-6" style={{ color: 'var(--text-secondary)' }}>
-                                        {t('options.systemFontNoResults') || '没有找到匹配的系统字体。'}
+                                        {t('options.systemFontNoResults')}
                                     </div>
                                 ) : (
                                     <div className="flex h-full min-h-0 flex-col gap-4">
                                         <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
                                             <div className="text-xs opacity-50" style={{ color: 'var(--text-secondary)' }}>
-                                                {t('options.currentFont') || '当前字体'}
+                                                {t('options.currentFont')}
                                             </div>
                                             <div className="mt-1 text-base font-medium" style={{ color: 'var(--text-primary)' }}>
                                                 {fontPickerTarget === 'subtitle'
-                                                    ? (subtitleFontFamily || (t('options.systemFontInactive') || '未启用'))
+                                                    ? (subtitleFontFamily || t('options.systemFontInactive'))
                                                     : (customFontFamily
                                                         ? currentFontLabel
-                                                        : (t('options.systemFontInactive') || '未启用'))}
+                                                        : t('options.systemFontInactive'))}
                                             </div>
                                             <div className="mt-1 text-xs opacity-50" style={{ color: 'var(--text-secondary)' }}>
                                                 {fontPickerTarget === 'subtitle'
-                                                    ? (subtitleFontFallbackFamilies.length > 0 ? subtitleFontFallbackFamilies.join(', ') : (t('options.fontFallbackEmpty') || '未设置备用字体'))
-                                                    : (fontFallbackFamilies.length > 0 ? fontFallbackFamilies.join(', ') : (t('options.fontFallbackEmpty') || '未设置备用字体'))}
+                                                    ? (subtitleFontFallbackFamilies.length > 0 ? subtitleFontFallbackFamilies.join(', ') : t('options.fontFallbackEmpty'))
+                                                    : (fontFallbackFamilies.length > 0 ? fontFallbackFamilies.join(', ') : t('options.fontFallbackEmpty'))}
                                             </div>
                                         </div>
                                         <FontFallbackStackControl
-                                            label={t('options.fontFallbackFamilies') || '备用字体'}
+                                            label={t('options.fontFallbackFamilies')}
                                             value={fontPickerTarget === 'subtitle' ? subtitleFontFallbackFamilies : fontFallbackFamilies}
                                             onChange={fontPickerTarget === 'subtitle' ? onSubtitleFontFallbackFamiliesChange : onFontFallbackFamiliesChange}
-                                            theme={previewTheme}
+                                            theme={activePickerTheme}
                                             placeholder={t('options.fontFallbackFamiliesPlaceholder') || 'Songti SC, SimSun, serif'}
                                         />
                                         <div className="min-h-0 flex-1">

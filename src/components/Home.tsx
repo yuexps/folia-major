@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Search, User, Loader2, ChevronRight, Settings , ChevronDown } from 'lucide-react';
 import { neteaseApi } from '../services/netease';
-import { HomeViewTab, NeteaseUser, NeteasePlaylist, SongResult, LocalSong, LocalLibraryGroup, LocalPlaylist, type StageStatus, type StageSource, type Theme } from '../types';
+import { HomeViewTab, NeteaseUser, NeteasePlaylist, SongResult, LocalSong, LocalLibraryGroup, LocalPlaylist, type StageStatus, type StageSource, type StatusMessage, type Theme } from '../types';
 import { NavidromeSong, NavidromeViewSelection } from '../types/navidrome';
 import { LOCAL_MUSIC_SCAN_PROGRESS_EVENT } from '../services/localMusicService';
 import LocalMusicView from './LocalMusicView';
@@ -13,6 +13,10 @@ import { useSearchNavigationStore } from '../stores/useSearchNavigationStore';
 import { useSettingsUiStore } from '../stores/useSettingsUiStore';
 import { useShallow } from 'zustand/react/shallow';
 
+/**
+ * @deprecated Legacy home implementation. It will be removed when the new home surface is complete;
+ * new home work belongs in components/app/home instead.
+ */
 interface HomeProps {
     onPlaySong: (song: SongResult, playlistCtx?: SongResult[], isFmCall?: boolean) => void;
     onBackToPlayer: () => void;
@@ -82,6 +86,7 @@ interface HomeProps {
     onPlayAll?: (songs: SongResult[]) => void;
     onAddAllToQueue?: (songs: SongResult[]) => void;
     onAddSongToQueue?: (song: SongResult) => void;
+    onStatusMessage?: (message: StatusMessage) => void;
 }
 
 const Home: React.FC<HomeProps> = ({
@@ -185,10 +190,10 @@ const Home: React.FC<HomeProps> = ({
         : 0;
     const homeTabs: Array<{ key: HomeViewTab; label: string; }> = [
         { key: 'playlist', label: t('home.playlists') },
-        { key: 'radio', label: t('home.radio') || '电台' },
-        { key: 'albums', label: t('home.albums') || '专辑' },
+        { key: 'radio', label: t('home.radio') },
+        { key: 'albums', label: t('home.albums') },
         { key: 'local', label: t('localMusic.folder') },
-        ...(navidromeEnabled ? [{ key: 'navidrome' as HomeViewTab, label: t('navidrome.title') || 'Navidrome' }] : []),
+        ...(navidromeEnabled ? [{ key: 'navidrome' as HomeViewTab, label: t('navidrome.title') }] : []),
     ];
 
     useEffect(() => {
@@ -328,9 +333,9 @@ const Home: React.FC<HomeProps> = ({
 
             const fmItem = {
                 id: 'personal_fm',
-                name: '私人FM',
+                name: t('home.personalFm'),
                 coverUrl: fmCoverUrl,
-                description: 'Personal FM',
+                description: t('home.personalFm'),
                 isFm: true,
             };
 
@@ -342,7 +347,7 @@ const Home: React.FC<HomeProps> = ({
                     name: r.name,
                     coverUrl: r.picUrl,
                     trackCount: r.trackCount,
-                    description: r.copywriter || '推荐歌单'
+                    description: r.copywriter || t('home.playlists')
                 }));
             }
             
@@ -475,7 +480,7 @@ const Home: React.FC<HomeProps> = ({
                                     <Settings size={20} style={{ color: 'var(--text-primary)' }} />
                                     {showUpdateIndicator && (
                                         <span className="text-[10px] font-medium text-zinc-800 dark:text-zinc-200 opacity-80 whitespace-nowrap bg-zinc-200/50 dark:bg-white/10 px-2 py-0.5 rounded-md">
-                                            新版本发布
+                                            {t('options.updateAvailable')}
                                         </span>
                                     )}
                                 </button>
@@ -492,7 +497,7 @@ const Home: React.FC<HomeProps> = ({
                                                 background: `conic-gradient(from -90deg, ${isDaylight ? (theme?.accentColor || 'rgba(17,24,39,0.92)') : 'rgba(255,255,255,0.98)'} 0deg ${scanProgressPercent * 3.6}deg, ${isDaylight ? 'rgba(24,24,27,0.16)' : 'rgba(255,255,255,0.14)'} ${scanProgressPercent * 3.6}deg 360deg)`,
                                                 borderRadius: '999px'
                                             }}
-                                            title="查看扫描进度"
+                                            title={t('options.scanProgress')}
                                         >
                                             <div
                                                 className={`relative flex items-center justify-center min-w-[56px] h-7 px-2.5 rounded-full backdrop-blur-md ${
@@ -515,13 +520,13 @@ const Home: React.FC<HomeProps> = ({
                                                     }`}
                                                 >
                                                     <div className="text-sm font-semibold truncate">
-                                                        正在扫描 {scanProgress.folderName}
+                                                        {t('options.scanningFolder', { folderName: scanProgress.folderName })}
                                                     </div>
                                                     <div className={`text-xs mt-1 ${isDaylight ? 'text-zinc-600' : 'text-zinc-300/70'}`}>
-                                                        正在后台提取元数据与封面，媒体库较大时会持续一段时间。
+                                                        {t('options.scanProgressDesc')}
                                                     </div>
                                                     <div className="mt-3 flex items-center justify-between text-xs font-mono">
-                                                        <span>进度</span>
+                                                        <span>{t('options.scanProgress')}</span>
                                                         <span>{Math.min(scanProgress.completedSongs, scanProgress.totalSongs)} / {scanProgress.totalSongs}</span>
                                                     </div>
                                                     <div className={`mt-2 w-full h-2 rounded-full overflow-hidden ${isDaylight ? 'bg-black/10' : 'bg-white/10'}`}>
@@ -570,7 +575,7 @@ const Home: React.FC<HomeProps> = ({
                                                 data-stage-active={stageIsActive ? 'true' : 'false'}
                                                 className={`relative inline-flex items-center justify-center px-3 md:px-4 py-1.5 rounded-full text-xs md:text-sm font-medium transition-colors duration-300 whitespace-nowrap ${navPillInactiveText}`}
                                             >
-                                                <span className="relative z-10">{t('home.stage') || '舞台'}</span>
+                                                <span className="relative z-10">{t('home.stage')}</span>
                                             </button>
                                         )}
                                     </div>
@@ -817,10 +822,22 @@ const Home: React.FC<HomeProps> = ({
                 </div>
 
                     {/* Login Modal */}
-                    {
-                        showLoginModal && (
-                            <div className="absolute inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-xl p-4">
-                                <div className="bg-zinc-900/90 border border-white/10 p-8 rounded-3xl max-w-sm w-full text-center relative shadow-2xl">
+                    <AnimatePresence>
+                        {showLoginModal && (
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                transition={{ duration: 0.25 }}
+                                className="absolute inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-xl p-4"
+                            >
+                                <motion.div
+                                    initial={{ scale: 0.92, opacity: 0, y: 24 }}
+                                    animate={{ scale: 1, opacity: 1, y: 0 }}
+                                    exit={{ scale: 0.92, opacity: 0, y: 12 }}
+                                    transition={{ type: 'spring', bounce: 0, duration: 0.5 }}
+                                    className="bg-zinc-900/90 border border-white/10 p-8 rounded-3xl max-w-sm w-full text-center relative shadow-2xl"
+                                >
                                     <button
                                         onClick={() => {
                                             setShowLoginModal(false);
@@ -850,10 +867,10 @@ const Home: React.FC<HomeProps> = ({
                                     <p className="text-[10px] opacity-30 mt-6" style={{ color: 'var(--text-secondary)' }}>
                                         {t('home.loginNote')}
                                     </p>
-                                </div>
-                            </div>
-                        )
-                    }
+                                </motion.div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
 
                     {/* User Avatar - Back to Player */}
                     {

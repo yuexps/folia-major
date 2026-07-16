@@ -1,6 +1,6 @@
 import type React from 'react';
 import type { SearchReturnView } from '../../stores/useSearchNavigationStore';
-import type { HomeViewTab, LocalSong, PlayerState, SongResult, VisualizerMode, VisualizerBackgroundMode, MonetBackgroundTuning } from '../../types';
+import type { HomeViewTab, LocalSong, PlayerState, SongResult, StatusMessage, VisualizerMode, VisualizerBackgroundMode, MonetBackgroundTuning } from '../../types';
 import type { AppLanguagePreference } from '../../i18n/config';
 import type { PanelTab } from '../UnifiedPanel';
 import type { SettingsModalInitialTab, SettingsSubviewId } from '../../stores/useSettingsUiStore';
@@ -17,6 +17,7 @@ export type CommandPaletteCommand = {
     group: CommandPaletteGroup;
     title: string;
     description: string;
+    textSource?: 'i18n' | 'runtime';
     keywords: string[];
     placeholder?: string;
     requiresInput?: boolean;
@@ -36,11 +37,14 @@ export type CommandPaletteContext = {
     localSongs: LocalSong[];
     playerState: PlayerState;
     t: (key: string, fallback?: string) => string;
+    setStatusMsg: React.Dispatch<React.SetStateAction<StatusMessage | null>>;
     openSettings: (initialTab?: SettingsModalInitialTab, initialSubview?: SettingsSubviewId | null) => void;
     navigateToHome: () => void;
     navigateToPlayer: () => void;
     navigateToSearch: (args: { query: string; sourceTab: HomeViewTab; replace?: boolean; returnView?: SearchReturnView; }) => void;
     toggleBrowserFullscreen: () => Promise<boolean>;
+    toggleRemoteControlWindow: () => Promise<boolean>;
+    toggleMainWindowAlwaysOnTop: () => Promise<boolean>;
     setHomeViewTab: (tab: HomeViewTab) => void;
     setPanelTab: (tab: PanelTab) => void;
     setIsPanelOpen: React.Dispatch<React.SetStateAction<boolean>>;
@@ -64,6 +68,8 @@ export type CommandPaletteContext = {
     isGeneratingTheme: boolean;
     generateAITheme: () => void;
     setVisualizerMode: (mode: VisualizerMode) => void;
+    randomVisualizerModePerSong: boolean;
+    toggleRandomVisualizerModePerSong: () => void;
     setVisualizerBackgroundMode: (mode: VisualizerBackgroundMode) => void;
     setMonetBackgroundTuning: (patch: Partial<MonetBackgroundTuning>) => void;
     toggleTransparentBackground: () => void;

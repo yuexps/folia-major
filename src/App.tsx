@@ -45,6 +45,7 @@ import { useElectronNeteaseApiStatus } from './hooks/useElectronNeteaseApiStatus
 import { useElectronVideoExportController } from './hooks/useElectronVideoExportController';
 import { useElectronWindowPlaybackHandoff } from './hooks/useElectronWindowPlaybackHandoff';
 import { useMediaSessionBridge } from './hooks/useMediaSessionBridge';
+import { usePlayerChromeAutoHide } from './hooks/usePlayerChromeAutoHide';
 import { usePlaybackAudioBridge } from './hooks/usePlaybackAudioBridge';
 import { usePlaybackInteractionBridge } from './hooks/usePlaybackInteractionBridge';
 import { usePlaybackUiEffects } from './hooks/usePlaybackUiEffects';
@@ -53,6 +54,7 @@ import { useNavidromeScrobbleReporter } from './hooks/useNavidromeScrobbleReport
 import { usePlaybackQueueController } from './hooks/usePlaybackQueueController';
 import { usePlaybackTransportController } from './hooks/usePlaybackTransportController';
 import { usePlaybackVisualizerBridge } from './hooks/usePlaybackVisualizerBridge';
+import { useRandomVisualizerMode } from './hooks/useRandomVisualizerMode';
 import { useObsBrowserSourcePublisher } from './hooks/useObsBrowserSourcePublisher';
 import { ObsBrowserSourceLyrics } from './components/obs/ObsBrowserSourceLyrics';
 import { useSessionRestoreController } from './hooks/useSessionRestoreController';
@@ -65,7 +67,10 @@ import { useSettingsUiStore } from './stores/useSettingsUiStore';
 import { useShallow } from 'zustand/react/shallow';
 import { clampMediaVolume } from './utils/appPlaybackHelpers';
 import { isLocalPlaybackSong, isNavidromePlaybackSong, isStagePlaybackSong, resolveNavidromePlaybackCarrier } from './utils/appPlaybackGuards';
+import { readLyricOffset, writeLyricOffset } from './utils/lyrics/lyricOffsetMemory';
 import { FALLBACK_AI_DUAL_THEME } from './services/themeSanitizer';
+import { initializeSyncCoordinator } from './services/sync/syncCoordinator';
+import type { PlayerChromeVisibilityMode } from './types/remoteControl';
 
 const LOCAL_MUSIC_UPDATED_EVENT = 'folia-local-music-updated';
 const DEV_DEBUG_SHORTCUT_LABEL = 'Alt+Shift+D';
@@ -249,6 +254,8 @@ export default function App() {
         }
     }, [lastSeenGuideVersion, setLastSeenGuideVersion, setIsUserGuideModalOpen, fromFullPlayerOverlay]);
 
+    useEffect(() => initializeSyncCoordinator(), []);
+
     const loadNavidromeFavorites = useCallback(async () => {
         if (!navidromeEnabled) {
             setStarredNavidromeSongIds(new Set());
@@ -388,6 +395,7 @@ export default function App() {
         transparentPlayerBackground,
         enablePlayerPageNativeBlur,
         autoHidePlayerChrome,
+        handleToggleAutoHidePlayerChrome,
         disableVisualizerVignette,
         disableVisualizerGeometricBackground,
         minimizeToTray,
@@ -400,6 +408,7 @@ export default function App() {
         visualizerBackgroundMode,
         isDaylight,
         visualizerMode,
+        randomVisualizerModePerSong,
         classicTuning,
         cadenzaTuning,
         partitaTuning,
@@ -407,6 +416,7 @@ export default function App() {
         claddaghTuning,
         cappellaTuning,
         tiltTuning,
+        dioramaTuning,
         monetBackgroundTuning,
         monetTuning,
         cappellaCustomEmojiImages,
@@ -448,6 +458,7 @@ export default function App() {
         handleSetBackgroundOpacity,
         setDaylightPreference,
         handleSetVisualizerMode,
+        handleToggleRandomVisualizerModePerSong,
         handleSetVisualizerBackgroundMode,
         handleSetMonetBackgroundTuning,
         handleSetMonetTuning,
@@ -480,14 +491,55 @@ export default function App() {
         handleToggleLoopMode,
     } = appPreferences;
 
+    const visualizerTunings = useMemo(() => ({
+        classic: classicTuning,
+        cadenza: cadenzaTuning,
+        partita: partitaTuning,
+        fume: fumeTuning,
+        claddagh: claddaghTuning,
+        cappella: cappellaTuning,
+        tilt: tiltTuning,
+        diorama: dioramaTuning,
+        monet: monetTuning,
+    }), [cadenzaTuning, cappellaTuning, classicTuning, claddaghTuning, dioramaTuning, fumeTuning, monetTuning, partitaTuning, tiltTuning]);
+
+    const showPlayerChromeVisibilityModeStatus = useCallback((mode: PlayerChromeVisibilityMode) => {
+        setStatusMsg({
+            type: 'info',
+            text: t(`status.playerChrome${mode === 'always-hidden' ? 'AlwaysHidden' : mode === 'always-visible' ? 'AlwaysVisible' : 'AutoHide'}`),
+            nonce: Date.now(),
+        });
+    }, [t]);
+
+    const {
+        playerChromeVisibilityMode,
+        cyclePlayerChromeVisibilityMode,
+    } = usePlayerChromeAutoHide({
+        autoHidePlayerChrome,
+        initialPlayerChromeHidden: isPlayerChromeHidden,
+        setIsPlayerChromeHidden,
+        setAutoHidePlayerChromePreference: handleToggleAutoHidePlayerChrome,
+        onModeChange: showPlayerChromeVisibilityModeStatus,
+    });
+
+    useRandomVisualizerMode({
+        currentSong,
+        enabled: randomVisualizerModePerSong,
+        visualizerMode,
+        setVisualizerMode: handleSetVisualizerMode,
+    });
+
     const setLyrics = useMemo(
         () => createLyricsSetter(setLyricsState, lyricFilterPattern, currentSongFullRef),
         [lyricFilterPattern],
     );
     const lyricCurrentTime = useMotionValue(0);
 
+    // On song change, restore that song's remembered manual offset (0 when never adjusted, so a
+    // fresh song behaves exactly like the old reset). currentSongFullRef.current holds the live song
+    // for the change handler below, so a user's correction is saved against the right track.
     useEffect(() => {
-        setLyricTimelineOffsetMs(0);
+        setLyricTimelineOffsetMs(readLyricOffset(currentSong?.id));
     }, [currentSong?.id]);
 
     const [nowPlayingLoopMode, setNowPlayingLoopMode] = useState<'off' | 'all' | 'one'>(() => {
@@ -498,6 +550,11 @@ export default function App() {
         return 'all';
     });
     let effectiveLoopMode: StageLoopMode = loopMode;
+
+    const handleLyricTimelineOffsetChange = useCallback((offsetMs: number) => {
+        setLyricTimelineOffsetMs(offsetMs);
+        writeLyricOffset(currentSongFullRef.current?.id, offsetMs);
+    }, []);
 
     const getTargetPlaybackVolume = useCallback(() => (isMuted ? 0 : volume), [isMuted, volume]);
 
@@ -620,7 +677,7 @@ export default function App() {
                 if (reportError) {
                     setStatusMsg({
                         type: 'error',
-                        text: '切换播放设备失败',
+                        text: t('options.audioOutputSelectFailed'),
                     });
                 }
                 return false;
@@ -769,6 +826,17 @@ export default function App() {
     } = themeController;
 
     useEffect(() => {
+        const handleSyncCompleted = () => {
+            if (currentSong) {
+                void restoreCachedThemeForSong(currentSong, { allowLastUsedFallback: true });
+            }
+        };
+
+        window.addEventListener('folia-themes-synced', handleSyncCompleted);
+        return () => window.removeEventListener('folia-themes-synced', handleSyncCompleted);
+    }, [currentSong, restoreCachedThemeForSong]);
+
+    useEffect(() => {
         const isPureMusic = Boolean(currentSong?.isPureMusic);
         const songTitle = currentSong?.name;
         const allText = lyrics?.lines.map(l => l.fullText).join('\n') || null;
@@ -779,13 +847,14 @@ export default function App() {
             customTheme,
             bgMode,
             coverUrl,
+            song: currentSong,
             songKey: currentSong?.id ?? null,
             isDaylight,
             promptSourceText,
             isPureMusic,
             songTitle,
         });
-    }, [aiTheme, bgMode, coverUrl, currentSong?.id, currentSong?.isPureMusic, currentSong?.name, customTheme, isDaylight, lyrics, setThemeQuickEditorContext]);
+    }, [aiTheme, bgMode, coverUrl, currentSong, currentSong?.id, currentSong?.isPureMusic, currentSong?.name, customTheme, isDaylight, lyrics, setThemeQuickEditorContext]);
 
     // Navigation and Library Hooks
     // manages current view, selected items, and navigation functions across the app
@@ -1109,6 +1178,7 @@ export default function App() {
         setHomeViewTab,
         setLocalMusicState,
         navigateDirectHome,
+        t,
     });
     const handleSaveLyricFilterPattern = createLyricFilterPatternSaver({
         handleSetLyricFilterPattern,
@@ -1118,7 +1188,7 @@ export default function App() {
         setStatusMsg,
     });
 
-    const { addNavidromeSongsToQueue } = createQueueMutations({
+    const { addNavidromeSongsToQueue, removeQueueSong, moveQueueSongToEnd, moveQueueSongToNext } = createQueueMutations({
         currentSong,
         playQueue,
         setPlayQueue,
@@ -1375,6 +1445,7 @@ export default function App() {
         exportState,
         handleExportCommand,
     } = useElectronVideoExportController({
+        t: (key) => t(key),
         isElectronWindow,
         audioRef,
         currentTime,
@@ -1394,6 +1465,8 @@ export default function App() {
         setIsTitlebarRevealed,
         isPlayerChromeHidden,
         setIsPlayerChromeHidden,
+        playerChromeVisibilityMode,
+        onRemotePlayerChromeVisibilityModeCycle: cyclePlayerChromeVisibilityMode,
         showTransparentWindowBorder,
         setShowTransparentWindowBorder,
         transparentPlayerBackground,
@@ -1492,7 +1565,7 @@ export default function App() {
         audioRef,
         stageLyricsClockRef,
         setIsDevDebugOverlayVisible,
-        setIsPlayerChromeHidden,
+        cyclePlayerChromeVisibilityMode,
         setIsPanelOpen,
         setReplayGainMode,
         setStatusMsg,
@@ -1563,53 +1636,6 @@ export default function App() {
     useEffect(() => {
         localStorage.setItem(PLAYER_CHROME_HIDDEN_STORAGE_KEY, String(isPlayerChromeHidden));
     }, [isPlayerChromeHidden]);
-
-    useEffect(() => {
-        if (!autoHidePlayerChrome) return;
-
-        let timeoutId: number;
-        let isThrottled = false;
-        let rafId: number;
-
-        const showAndResetTimer = () => {
-            setIsPlayerChromeHidden(false);
-            window.clearTimeout(timeoutId);
-            timeoutId = window.setTimeout(() => {
-                setIsPlayerChromeHidden(true);
-            }, 3000);
-        };
-
-        const handleMouseOut = (e: MouseEvent) => {
-            if (!e.relatedTarget || (e.clientY <= 0 || e.clientX <= 0 || e.clientX >= window.innerWidth || e.clientY >= window.innerHeight)) {
-                window.clearTimeout(timeoutId);
-                timeoutId = window.setTimeout(() => {
-                    setIsPlayerChromeHidden(true);
-                }, 300);
-            }
-        };
-
-        const throttledMouseMove = () => {
-            if (isThrottled) return;
-            isThrottled = true;
-            rafId = requestAnimationFrame(() => {
-                showAndResetTimer();
-                isThrottled = false;
-            });
-        };
-
-        // Initialize timer
-        showAndResetTimer();
-
-        window.addEventListener('mouseout', handleMouseOut);
-        window.addEventListener('mousemove', throttledMouseMove);
-
-        return () => {
-            window.clearTimeout(timeoutId);
-            cancelAnimationFrame(rafId);
-            window.removeEventListener('mouseout', handleMouseOut);
-            window.removeEventListener('mousemove', throttledMouseMove);
-        };
-    }, [autoHidePlayerChrome]);
 
     useEffect(() => {
         const body = document.body;
@@ -1763,6 +1789,7 @@ export default function App() {
         subtitleTheme: visualizerSubtitleTheme,
         isDaylight,
         visualizerMode,
+        visualizerTunings,
         visualizerBackgroundMode,
         lyricsFontScale,
         backgroundOpacity,
@@ -1778,17 +1805,9 @@ export default function App() {
         seed: visualizerGeometrySeed,
         audioPower,
         audioBands,
-        classicTuning,
-        cadenzaTuning,
-        partitaTuning,
-        fumeTuning,
-        claddaghTuning,
-        cappellaTuning,
         cappellaCustomEmojiImages,
         cappellaCustomAvatarImages,
-        tiltTuning,
         monetBackgroundTuning,
-        monetTuning,
         monetBackgroundImage,
         monetPortraitImage,
         urlBackgroundList,
@@ -1835,16 +1854,35 @@ export default function App() {
             return false;
         }
     }, []);
+    const toggleRemoteControlWindow = useCallback(async () => {
+        if (!window.electron?.toggleRemoteControl) {
+            return false;
+        }
+
+        return window.electron.toggleRemoteControl();
+    }, []);
+    const toggleMainWindowAlwaysOnTop = useCallback(async () => {
+        if (!window.electron?.getMainWindowAlwaysOnTop || !window.electron?.setMainWindowAlwaysOnTop) {
+            return false;
+        }
+
+        const enabled = await window.electron.getMainWindowAlwaysOnTop();
+        await window.electron.setMainWindowAlwaysOnTop(!enabled);
+        return true;
+    }, []);
     const commandPaletteContext = useMemo(() => ({
         currentSearchSourceTab: currentSearchSourceTabInPalette,
         localSongs,
         playerState,
         t: (key: string, fallback?: string) => t(key, fallback ?? ''),
+        setStatusMsg,
         openSettings,
         navigateToHome,
         navigateToPlayer,
         navigateToSearch,
         toggleBrowserFullscreen,
+        toggleRemoteControlWindow,
+        toggleMainWindowAlwaysOnTop,
         setHomeViewTab,
         setPanelTab,
         setIsPanelOpen,
@@ -1860,6 +1898,10 @@ export default function App() {
         isGeneratingTheme,
         generateAITheme: generateCurrentSongTheme,
         setVisualizerMode: handleSetVisualizerMode,
+        randomVisualizerModePerSong,
+        toggleRandomVisualizerModePerSong: () => {
+            handleToggleRandomVisualizerModePerSong(!randomVisualizerModePerSong);
+        },
         setVisualizerBackgroundMode: handleSetVisualizerBackgroundMode,
         setMonetBackgroundTuning: handleSetMonetBackgroundTuning,
         toggleTransparentBackground: () => {
@@ -1891,6 +1933,7 @@ export default function App() {
         handleNextTrack,
         handlePrevTrack,
         handleSetVisualizerMode,
+        handleToggleRandomVisualizerModePerSong,
         handleSetVisualizerBackgroundMode,
         handleSetMonetBackgroundTuning,
         handleToggleHidePlayerTranslationSubtitle,
@@ -1905,6 +1948,7 @@ export default function App() {
         playQueue,
         playSong,
         playerState,
+        randomVisualizerModePerSong,
         canGenerateAITheme,
         currentSearchSourceTabInPalette,
         setHomeViewTab,
@@ -1912,6 +1956,8 @@ export default function App() {
         submitSearch,
         t,
         toggleBrowserFullscreen,
+        toggleRemoteControlWindow,
+        toggleMainWindowAlwaysOnTop,
         toggleLoop,
         togglePlay,
         transparentPlayerBackground,
@@ -2070,7 +2116,7 @@ export default function App() {
                 source: 'netease',
                 id: albumId,
                 type: 'album',
-                name: '专辑',
+                name: t('home.albums'),
             });
             navigateDirectHome({ clearContext: false });
         } else {
@@ -2084,7 +2130,7 @@ export default function App() {
                 source: 'netease',
                 id: artistId,
                 type: 'artist',
-                name: '歌手',
+                name: t('navidrome.artists'),
             });
             navigateDirectHome({ clearContext: false });
         } else {
@@ -2098,7 +2144,7 @@ export default function App() {
                 source: 'netease',
                 id: albumId,
                 type: 'album',
-                name: '专辑',
+                name: t('home.albums'),
                 returnToPlayerOnClose: true,
             });
             navigateDirectHome({ clearContext: false });
@@ -2113,7 +2159,7 @@ export default function App() {
                 source: 'netease',
                 id: artistId,
                 type: 'artist',
-                name: '歌手',
+                name: t('navidrome.artists'),
                 returnToPlayerOnClose: true,
             });
             navigateDirectHome({ clearContext: false });
@@ -2173,6 +2219,7 @@ export default function App() {
         playAll: playOnlineQueueFromStart,
         addAllToQueue: addNeteaseSongsToQueue,
         addSongToQueue: addNeteaseSongToQueue,
+        onStatusMessage: setStatusMsg,
     }), [
         activePlaybackContext,
         addNavidromeSongsToQueue,
@@ -2285,6 +2332,7 @@ export default function App() {
         setLocalMusicState,
         setNavidromeFocusedAlbumIndex,
         setPendingNavidromeSelection,
+        setStatusMsg,
         setStageStatus,
         showOpenPanelCloseButton,
         songThemeAutoSwitchEnabled,
@@ -2354,7 +2402,7 @@ export default function App() {
         handleMatchOnlineLyrics,
         handleClearOnlineLyricsState,
         lyricTimelineOffsetMs,
-        handleLyricTimelineOffsetChange: setLyricTimelineOffsetMs,
+        handleLyricTimelineOffsetChange,
         replayGainMode,
         handleChangeReplayGainMode,
         isFmMode,
@@ -2379,6 +2427,9 @@ export default function App() {
         playSong,
         queueScrollRef,
         shuffleQueue,
+        removeQueueSong,
+        moveQueueSongToEnd,
+        moveQueueSongToNext,
         localPlaylists,
         playlists,
         saveCurrentQueueAsLocalPlaylist,
@@ -2433,7 +2484,7 @@ export default function App() {
                                 name: artistName,
                                 type: 'artist',
                                 coverUrl: currentSong.al?.picUrl || currentSong.album?.picUrl || undefined,
-                                description: `${songs.length} 首歌曲`,
+                                description: `${songs.length} ${t('home.songs')}`,
                                 trackCount: songs.length,
                                 songIds: songs.map(song => song.id),
                                 returnToPlayerOnClose: true,
@@ -2452,7 +2503,7 @@ export default function App() {
                 const playbackCarrier = currentNavidromeSong?.navidromeData;
                 const albumId = currentNavidromeSong?.albumId || playbackCarrier?.albumId;
                 if (albumId) {
-                    const albumName = currentSong?.al?.name || currentSong?.album?.name || '专辑';
+                    const albumName = currentSong?.al?.name || currentSong?.album?.name || t('localMusic.unknownAlbum');
                     setActiveGridViewCollection({
                         source: 'navidrome',
                         id: albumId,
@@ -2473,7 +2524,7 @@ export default function App() {
                 const playbackCarrier = currentNavidromeSong?.navidromeData;
                 const artistId = currentNavidromeSong?.artistId || playbackCarrier?.artistId;
                 if (artistId) {
-                    const artistName = currentSong?.ar?.[0]?.name || currentSong?.artists?.[0]?.name || '歌手';
+                    const artistName = currentSong?.ar?.[0]?.name || currentSong?.artists?.[0]?.name || t('localMusic.unknownArtist');
                     setActiveGridViewCollection({
                         source: 'navidrome',
                         id: artistId,
@@ -2573,6 +2624,9 @@ export default function App() {
         setTheme,
         showOpenPanelCloseButton,
         shuffleQueue,
+        removeQueueSong,
+        moveQueueSongToEnd,
+        moveQueueSongToNext,
         theme,
         themeSourceModel,
         toggleLoop,
@@ -3035,15 +3089,8 @@ export default function App() {
                         isPlayerChromeHidden={isPlayerChromeHidden}
                         hideTranslationSubtitle={shouldHidePlayerTranslationSubtitle}
                         showSubtitleTranslation={showSubtitleTranslation}
-                        classicTuning={classicTuning}
-                        cadenzaTuning={cadenzaTuning}
-                        partitaTuning={partitaTuning}
-                        fumeTuning={fumeTuning}
-                        claddaghTuning={claddaghTuning}
-                        cappellaTuning={cappellaTuning}
-                        tiltTuning={tiltTuning}
+                        visualizerTunings={visualizerTunings}
                         monetBackgroundTuning={monetBackgroundTuning}
-                        monetTuning={monetTuning}
                         onMonetTuningChange={handleSetMonetTuning}
                         cappellaCustomEmojiImages={cappellaCustomEmojiImages}
                         cappellaCustomAvatarImages={cappellaCustomAvatarImages}
@@ -3081,7 +3128,7 @@ export default function App() {
                             {fromFullPlayerOverlay
                                 ? '等待宿主播放歌曲'
                                 : (stageSource === 'now-playing'
-                                    ? '等待本地 Now Playing 服务输入'
+                                    ? (t('options.stageSessionEmpty') || '等待本地 Now Playing 服务输入')
                                     : (t('options.stageSessionEmpty') || '等待外部输入'))}
                         </div>
                         <div className="mt-2 text-sm opacity-70">
@@ -3089,8 +3136,8 @@ export default function App() {
                                 ? '请在 2FMusic 播放器中选择歌曲并播放'
                                 : stageSource === 'now-playing'
                                     ? (nowPlayingConnectionStatus === 'error'
-                                        ? '未能连接到 ws://localhost:9863/api/ws/lyric，请确认 now-playing 服务已在本机运行'
-                                        : '请在本机启动 now-playing 服务，并确保播放器正在播放')
+                                        ? (t('options.stageConnectionError') || '未能连接到 ws://localhost:9863/api/ws/lyric，请确认 now-playing 服务已在本机运行')
+                                        : (t('options.stageNotRunning') || '请在本机启动 now-playing 服务，并确保播放器正在播放'))
                                     : (t('options.enableStageModeDesc') || '本地 Stage API 已开启')}
                         </div>
                     </div>
@@ -3109,6 +3156,7 @@ export default function App() {
                 activeIndex={commandPalette.activeIndex}
                 activePreview={commandPalette.activePreview}
                 activeCommand={commandPalette.activeCommand}
+                availableCommands={commandPalette.availableCommands}
                 isDaylight={isDaylight}
                 isComposing={commandPalette.isComposing}
                 isExecuting={commandPalette.isExecuting}

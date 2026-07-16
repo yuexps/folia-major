@@ -46,14 +46,45 @@ export const createQueueMutations = ({
         if (changed && affectedSongs.length > 0) {
             setStatusMsg({
                 type: 'success',
-                text: queueAddBehavior === 'next' ? '已插入到下一首' : (t('status.queueUpdated') || '已添加到播放队列'),
+                text: queueAddBehavior === 'next' ? t('status.insertedToNext') : t('status.queueUpdated'),
                 nonce: Date.now(),
                 durationMs: 1200,
             });
         }
     };
 
+    const updateQueueOrder = (nextQueue: SongResult[]) => {
+        setPlayQueue(nextQueue);
+        void persistLastPlaybackCache(currentSong, nextQueue);
+    };
+
+    const removeQueueSong = (index: number) => {
+        updateQueueOrder(playQueue.filter((_, songIndex) => songIndex !== index));
+    };
+
+    const moveQueueSongToEnd = (index: number) => {
+        if (index < 0 || index >= playQueue.length - 1) return;
+        const nextQueue = [...playQueue];
+        const [song] = nextQueue.splice(index, 1);
+        nextQueue.push(song);
+        updateQueueOrder(nextQueue);
+    };
+
+    const moveQueueSongToNext = (index: number) => {
+        const currentIndex = currentSong ? playQueue.findIndex(song => song.id === currentSong.id) : -1;
+        const targetIndex = Math.min(currentIndex + 1, playQueue.length - 1);
+        if (index < 0 || index >= playQueue.length || index === targetIndex || index === currentIndex) return;
+        const nextQueue = [...playQueue];
+        const [song] = nextQueue.splice(index, 1);
+        const adjustedTargetIndex = index < targetIndex ? targetIndex - 1 : targetIndex;
+        nextQueue.splice(adjustedTargetIndex, 0, song);
+        updateQueueOrder(nextQueue);
+    };
+
     return {
         addNavidromeSongsToQueue,
+        removeQueueSong,
+        moveQueueSongToEnd,
+        moveQueueSongToNext,
     };
 };

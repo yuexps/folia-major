@@ -76,12 +76,12 @@ type UsePlaybackQueueControllerParams = {
     openLocalArtistByName: (artistName: string) => void;
     openLocalAlbumByName: (albumName: string) => void;
     persistLastPlaybackCache: (song: SongResult | null, queue: SongResult[]) => Promise<void>;
-    restoreCachedThemeForSong: (songId: ThemeCacheSongKey, options?: {
+    restoreCachedThemeForSong: (songOrId: ThemeCacheSongKey | SongResult, options?: {
         allowLastUsedFallback?: boolean;
         preserveCurrentOnMiss?: boolean;
     }) => Promise<unknown>;
     interruptStagePlaybackForMainTransition: () => unknown;
-    onPlayLocalSong: (localSong: LocalSong, queue?: LocalSong[]) => Promise<void>;
+    onPlayLocalSong: (localSong: LocalSong, queue?: LocalSong[], options?: PlaybackNavigationOptions) => Promise<void>;
     onPlayNavidromeSong: (
         navidromeSong: NavidromeSong,
         queue?: NavidromeSong[],
@@ -467,14 +467,14 @@ export function usePlaybackQueueController({
             }
 
             if (!localData) {
-                setStatusMsg({ type: 'error', text: '无法播放本地文件 (文件可能已移动或权限丢失)' });
+                setStatusMsg({ type: 'error', text: t('status.localFilePlaybackError') });
                 return;
             }
 
             const localQueue = queueContext
                 .map(queuedSong => (queuedSong as SongResult & { localData?: LocalSong }).localData)
                 .filter((queuedSong): queuedSong is LocalSong => Boolean(queuedSong));
-            await onPlayLocalSong(localData, localQueue);
+            await onPlayLocalSong(localData, localQueue, { shouldNavigateToPlayer });
             return;
         }
 
@@ -627,7 +627,7 @@ export function usePlaybackQueueController({
         }
 
         try {
-            await restoreCachedThemeForSong(song.id);
+            await restoreCachedThemeForSong(song);
             if (currentSongRef.current !== song.id) return;
         } catch (error) {
             console.warn('Theme load error', error);
@@ -834,6 +834,8 @@ export function usePlaybackQueueController({
 
         if (currentIndex >= 0 && currentIndex < playQueue.length - 1) {
             nextIndex = currentIndex + 1;
+        } else if (currentIndex < 0 && playQueue.length > 0) {
+            nextIndex = 0;
         } else if (loopMode === 'all') {
             nextIndex = 0;
         }

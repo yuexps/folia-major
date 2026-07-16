@@ -47,6 +47,54 @@ if (process.platform === 'darwin' && process.arch === 'x64') {
 }
 
 const store = new Store({ projectName: 'Folia' });
+
+// --- Electron main process locale map ---
+const APP_LOCALE_KEY = 'APP_LOCALE';
+const mainLocale = {
+  'zh-CN': {
+    trayShowHide: '显示/隐藏主窗口',
+    trayOpenRemote: '打开 遥控窗口',
+    trayToggleClickThrough: '切换点击穿透',
+    trayHideTaskbar: '隐藏任务栏图标',
+    trayQuit: '退出',
+    dialogImportTitle: '无法导入此文件夹',
+    dialogImportMessage: '不能直接导入系统目录或常用用户目录。\n请选择一个专门存放音乐的文件夹。',
+    dialogChooseOther: '选择其他文件夹',
+    dialogCancel: '取消',
+  },
+  en: {
+    trayShowHide: 'Show/Hide Main Window',
+    trayOpenRemote: 'Open Remote Window',
+    trayToggleClickThrough: 'Toggle Click-Through',
+    trayHideTaskbar: 'Hide Taskbar Icon',
+    trayQuit: 'Quit',
+    dialogImportTitle: 'Cannot import this folder',
+    dialogImportMessage: 'Cannot directly import system or common user directories.\nPlease choose a dedicated music folder.',
+    dialogChooseOther: 'Choose Another Folder',
+    dialogCancel: 'Cancel',
+  },
+  in: {
+    trayShowHide: 'Tampilkan/Sembunyikan Jendela Utama',
+    trayOpenRemote: 'Buka Jendela Remote',
+    trayToggleClickThrough: 'Alihkan Click-Through',
+    trayHideTaskbar: 'Sembunyikan Ikon Taskbar',
+    trayQuit: 'Keluar',
+    dialogImportTitle: 'Tidak dapat mengimpor folder ini',
+    dialogImportMessage: 'Folder sistem atau folder pengguna umum tidak dapat diimpor langsung.\nPilih folder khusus untuk menyimpan musik.',
+    dialogChooseOther: 'Pilih Folder Lain',
+    dialogCancel: 'Batal',
+  },
+};
+
+function getMainLocale() {
+  const stored = store.get(APP_LOCALE_KEY);
+  if (stored === 'zh-CN' || stored === 'en' || stored === 'in') {
+    return mainLocale[stored];
+  }
+  return mainLocale.en;
+}
+
+
 let mainWindow = null;
 let remoteControlWindow = null;
 let appTray = null;
@@ -57,6 +105,7 @@ let latestObsBrowserSourceClock = null;
 let latestObsBrowserSourceAudio = null;
 const obsBrowserSourceClients = new Set();
 let remoteControlAlwaysOnTop = false;
+let remoteControlSkipTaskbarEnabled = false;
 let mainWindowAlwaysOnTop = false;
 let mainWindowClickThroughEnabled = false;
 let mainWindowClickThroughUnlockHover = false;
@@ -95,6 +144,7 @@ const DISCORD_RICH_PRESENCE_ENABLED_SETTING_KEY = 'DISCORD_RICH_PRESENCE_ENABLED
 const MINIMIZE_TO_TRAY_SETTING_KEY = 'MINIMIZE_TO_TRAY';
 const HIDE_TASKBAR_ICON_SETTING_KEY = 'HIDE_TASKBAR_ICON';
 const REMOTE_CONTROL_ALWAYS_ON_TOP_SETTING_KEY = 'REMOTE_CONTROL_ALWAYS_ON_TOP';
+const REMOTE_CONTROL_SKIP_TASKBAR_SETTING_KEY = 'REMOTE_CONTROL_SKIP_TASKBAR';
 const MAIN_WINDOW_ALWAYS_ON_TOP_SETTING_KEY = 'MAIN_WINDOW_ALWAYS_ON_TOP';
 const TRANSPARENT_PLAYER_BACKGROUND_SETTING_KEY = 'TRANSPARENT_PLAYER_BACKGROUND';
 
@@ -204,6 +254,7 @@ function getPublicSettings() {
     [MINIMIZE_TO_TRAY_SETTING_KEY]: readStoredBoolean(MINIMIZE_TO_TRAY_SETTING_KEY, false),
     [HIDE_TASKBAR_ICON_SETTING_KEY]: readStoredBoolean(HIDE_TASKBAR_ICON_SETTING_KEY, false),
     [REMOTE_CONTROL_ALWAYS_ON_TOP_SETTING_KEY]: readStoredBoolean(REMOTE_CONTROL_ALWAYS_ON_TOP_SETTING_KEY, true),
+    [REMOTE_CONTROL_SKIP_TASKBAR_SETTING_KEY]: readStoredBoolean(REMOTE_CONTROL_SKIP_TASKBAR_SETTING_KEY, false),
     [MAIN_WINDOW_ALWAYS_ON_TOP_SETTING_KEY]: readStoredBoolean(MAIN_WINDOW_ALWAYS_ON_TOP_SETTING_KEY, false),
     [TRANSPARENT_PLAYER_BACKGROUND_SETTING_KEY]: readStoredBoolean(TRANSPARENT_PLAYER_BACKGROUND_SETTING_KEY, false),
     [DISCORD_RICH_PRESENCE_ENABLED_SETTING_KEY]: readStoredBoolean(DISCORD_RICH_PRESENCE_ENABLED_SETTING_KEY, false),
@@ -266,6 +317,7 @@ function broadcastObsBrowserSourceStatus() {
 
 mainWindowSkipTaskbarEnabled = readStoredBoolean(HIDE_TASKBAR_ICON_SETTING_KEY, false);
 remoteControlAlwaysOnTop = readStoredBoolean(REMOTE_CONTROL_ALWAYS_ON_TOP_SETTING_KEY, true);
+remoteControlSkipTaskbarEnabled = readStoredBoolean(REMOTE_CONTROL_SKIP_TASKBAR_SETTING_KEY, false);
 mainWindowAlwaysOnTop = readStoredBoolean(MAIN_WINDOW_ALWAYS_ON_TOP_SETTING_KEY, false);
 
 const stageApi = createStageApi({
@@ -562,6 +614,15 @@ function applyRemoteControlAlwaysOnTop(win) {
   return remoteControlAlwaysOnTop;
 }
 
+function applyRemoteControlSkipTaskbar(win) {
+  if (!win || win.isDestroyed()) {
+    return false;
+  }
+
+  win.setSkipTaskbar(remoteControlSkipTaskbarEnabled);
+  return remoteControlSkipTaskbarEnabled;
+}
+
 function applyMainWindowAlwaysOnTop() {
   if (!mainWindow || mainWindow.isDestroyed()) {
     return false;
@@ -589,21 +650,22 @@ function refreshTrayMenu() {
     return;
   }
 
+  const locale = getMainLocale();
   const menu = Menu.buildFromTemplate([
     {
-      label: '显示/隐藏主窗口',
+      label: locale.trayShowHide,
       click: () => {
         toggleMainWindowVisibility();
       },
     },
     {
-      label: '打开 遥控窗口',
+      label: locale.trayOpenRemote,
       click: () => {
         createRemoteControlWindow();
       },
     },
     {
-      label: '切换点击穿透',
+      label: locale.trayToggleClickThrough,
       type: 'checkbox',
       checked: mainWindowClickThroughEnabled,
       enabled: Boolean(mainWindow && !mainWindow.isDestroyed()),
@@ -612,7 +674,7 @@ function refreshTrayMenu() {
       },
     },
     {
-      label: '隐藏任务栏图标',
+      label: locale.trayHideTaskbar,
       type: 'checkbox',
       checked: mainWindowSkipTaskbarEnabled,
       enabled: Boolean(mainWindow && !mainWindow.isDestroyed()),
@@ -622,7 +684,7 @@ function refreshTrayMenu() {
     },
     { type: 'separator' },
     {
-      label: '退出',
+      label: locale.trayQuit,
       click: () => {
         app.quit();
       },
@@ -2413,6 +2475,7 @@ function createRemoteControlWindow() {
   if (remoteControlWindow && !remoteControlWindow.isDestroyed()) {
     remoteControlWindow.setTitle(REMOTE_CONTROL_WINDOW_TITLE);
     applyRemoteControlAlwaysOnTop(remoteControlWindow);
+    applyRemoteControlSkipTaskbar(remoteControlWindow);
     remoteControlWindow.show();
     remoteControlWindow.focus();
     broadcastPlaybackSyncBridgeStatus();
@@ -2438,6 +2501,7 @@ function createRemoteControlWindow() {
     minimizable: true,
     maximizable: false,
     alwaysOnTop: remoteControlAlwaysOnTop,
+    skipTaskbar: remoteControlSkipTaskbarEnabled,
     icon: APP_ICON_PATH,
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
@@ -2645,11 +2709,12 @@ app.whenReady().then(async () => {
 
   session.defaultSession.on('file-system-access-restricted', (event, details, callback) => {
     if (details.isDirectory) {
+      const locale = getMainLocale();
       dialog.showMessageBox(mainWindow, {
         type: 'warning',
-        title: '无法导入此文件夹',
-        message: '不能直接导入系统目录或常用用户目录。\n请选择一个专门存放音乐的文件夹。',
-        buttons: ['选择其他文件夹', '取消'],
+        title: locale.dialogImportTitle,
+        message: locale.dialogImportMessage,
+        buttons: [locale.dialogChooseOther, locale.dialogCancel],
         defaultId: 0,
         cancelId: 1,
       }).then(({ response }) => {
@@ -2711,6 +2776,14 @@ ipcMain.handle('get-settings', () => {
   return getPublicSettings();
 });
 
+ipcMain.handle('set-app-locale', (event, localeKey) => {
+  if (localeKey === 'zh-CN' || localeKey === 'en' || localeKey === 'in') {
+    store.set(APP_LOCALE_KEY, localeKey);
+    refreshTrayMenu();
+  }
+  return localeKey;
+});
+
 ipcMain.handle('save-settings', (event, key, value) => {
   if (key === 'DISCORD_RICH_PRESENCE_APPLICATION_ID') {
     return getPublicSettings();
@@ -2721,6 +2794,7 @@ ipcMain.handle('save-settings', (event, key, value) => {
     key === MINIMIZE_TO_TRAY_SETTING_KEY ||
     key === HIDE_TASKBAR_ICON_SETTING_KEY ||
     key === REMOTE_CONTROL_ALWAYS_ON_TOP_SETTING_KEY ||
+    key === REMOTE_CONTROL_SKIP_TASKBAR_SETTING_KEY ||
     key === TRANSPARENT_PLAYER_BACKGROUND_SETTING_KEY ||
     key === DISCORD_RICH_PRESENCE_ENABLED_SETTING_KEY
   ) {
@@ -2775,6 +2849,11 @@ ipcMain.handle('save-settings', (event, key, value) => {
   if (key === REMOTE_CONTROL_ALWAYS_ON_TOP_SETTING_KEY) {
     remoteControlAlwaysOnTop = Boolean(nextValue);
     applyRemoteControlAlwaysOnTop(remoteControlWindow);
+  }
+
+  if (key === REMOTE_CONTROL_SKIP_TASKBAR_SETTING_KEY) {
+    remoteControlSkipTaskbarEnabled = Boolean(nextValue);
+    applyRemoteControlSkipTaskbar(remoteControlWindow);
   }
 
   if (key === STAGE_MODE_SOURCE_SETTING_KEY) {
@@ -3191,6 +3270,20 @@ ipcMain.handle('thumbar-update-buttons', (event, state) => {
 ipcMain.handle('remote-control-open', (event) => {
   if (!isTrustedMainWindowContents(event.sender)) {
     throw new Error('Untrusted renderer attempted to open the remote control window.');
+  }
+
+  createRemoteControlWindow();
+  return true;
+});
+
+ipcMain.handle('remote-control-toggle', (event) => {
+  if (!isTrustedMainWindowContents(event.sender)) {
+    throw new Error('Untrusted renderer attempted to toggle the remote control window.');
+  }
+
+  if (remoteControlWindow && !remoteControlWindow.isDestroyed()) {
+    remoteControlWindow.close();
+    return false;
   }
 
   createRemoteControlWindow();

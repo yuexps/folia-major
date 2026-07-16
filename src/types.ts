@@ -447,12 +447,16 @@ export interface CladdaghTuning {
   focusScaleRatio: number;
   radiusScale: number;
   ellipseTiltDeg: number;
+  showAxisLine: boolean;
+  letterSpacingOffset: number;
 }
 
 export const DEFAULT_CLADDAGH_TUNING: CladdaghTuning = {
   focusScaleRatio: 0.65,
   radiusScale: 1.0,
   ellipseTiltDeg: 45,
+  showAxisLine: true,
+  letterSpacingOffset: 0,
 };
 
 export type CappellaEmojiPackSource = 'builtin' | 'custom';
@@ -482,6 +486,38 @@ export const DEFAULT_TILT_TUNING: TiltTuning = {
   splitProbability: 0.75,
   tiltStyleProbability: 0.35,
   colorScheme: 'default',
+};
+
+// Diorama's camera STYLE (calm/standard/chaotic) is not part of its tuning: like every other
+// visualizer it follows theme.animationIntensity (the player-panel intensity chip / AI themes), so
+// the theme system stays the single source of truth. The tuning only carries diorama-specific knobs.
+export interface DioramaTuning {
+  cameraSpeed: number;
+  motionAmount: number;
+  audioReactivity: number;
+  showParticles: boolean;
+  /** 普通辉光跟唱: soft glow on the unit being sung. Independent toggle + strength. */
+  glowEnabled: boolean;
+  glowIntensity: number;
+  /** 灵魂出窍跟唱: a ghost copy of the sung glyph drifts out of the text. Independent toggle + strength. */
+  soulEnabled: boolean;
+  soulIntensity: number;
+  /** 渐变跟唱: the line's fill progressively deepens with the sung progress. Independent toggle + strength. */
+  gradientEnabled: boolean;
+  gradientIntensity: number;
+}
+
+export const DEFAULT_DIORAMA_TUNING: DioramaTuning = {
+  cameraSpeed: 1,
+  motionAmount: 1,
+  audioReactivity: 1,
+  showParticles: true,
+  glowEnabled: true,
+  glowIntensity: 1,
+  soulEnabled: true,
+  soulIntensity: 1,
+  gradientEnabled: false,
+  gradientIntensity: 1,
 };
 
 export type MonetBackgroundSource = 'cover-derived' | 'uploaded-global';
@@ -741,6 +777,9 @@ export interface LocalSong {
   title?: string;
   artist?: string;
   album?: string;
+  trackNumber?: number;
+  discNumber?: number;
+  embeddedMetadataVersion?: number;
 
   // Embedded metadata from file tags
   embeddedTitle?: string;

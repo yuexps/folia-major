@@ -6,6 +6,9 @@ import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
 import { formatSongName } from '../utils/songNameFormatter';
 
+/**
+ * @deprecated Kept only for navigation from search results. Do not add new list-view features here.
+ */
 interface AlbumViewProps {
     albumId: number;
     onBack: () => void;
@@ -171,7 +174,7 @@ const AlbumView: React.FC<AlbumViewProps> = ({ albumId, onBack, onPlaySong, onPl
                                         style={{ color: 'var(--text-primary)' }}
                                     >
                                         <ListPlus size={16} />
-                                        {t('navidrome.addToQueue') || '加入播放队列'}
+                                        {t('navidrome.addToQueue')}
                                     </button>
                                 </div>
                             </div>
@@ -238,7 +241,7 @@ const AlbumView: React.FC<AlbumViewProps> = ({ albumId, onBack, onPlaySong, onPl
                                                     onAddSongToQueue(track);
                                                 }}
                                                 className="p-2 ml-2 rounded-full hover:bg-white/10 opacity-0 group-hover:opacity-100 transition-all"
-                                                title={t('navidrome.addToQueue') || '加入播放队列'}
+                                                title={t('navidrome.addToQueue')}
                                                 style={{ color: 'var(--text-secondary)' }}
                                             >
                                                 <Plus size={14} />

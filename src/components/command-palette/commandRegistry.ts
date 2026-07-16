@@ -1,6 +1,8 @@
 import { PlayerState, type HomeViewTab, type SongResult, type VisualizerMode, type VisualizerBackgroundMode, type MonetBackgroundTuning } from '../../types';
 import type { AppLanguagePreference } from '../../i18n/config';
 import type { PanelTab } from '../UnifiedPanel';
+import { syncNow } from '../../services/sync/syncCoordinator';
+import { isSyncConfigured } from '../../services/sync/syncConfig';
 import type {
     CommandPaletteCommand,
     CommandPaletteContext,
@@ -257,9 +259,28 @@ export const COMMAND_PALETTE_COMMANDS: CommandPaletteCommand[] = [
     createSettingsCommand('settings-discord-presence', 'Discord playback status', 'Open Discord Rich Presence settings', ['discord', 'rich presence', 'discord presence', 'playing status', '播放状态', 'discord状态', 'discordzhuangtai', 'bofangzhuangtai', 'dc', 'zt'], 'options', 'integration'),
     createSettingsCommand('settings-obs-browser-source', 'OBS browser source', 'Open OBS browser source settings', ['obs', 'browser source', 'live source', '直播源', '浏览器源', 'zhiboyuan', 'liulanqiyuan', 'zby', 'llqy'], 'options', 'integration'),
     createSettingsCommand('settings-storage', 'Storage settings', 'Open cache and storage settings', ['storage', 'cache', '存储', '缓存', 'cunchu', 'huancun', 'cc', 'hc'], 'options', 'storage'),
+    createSettingsCommand('settings-r2-sync', 'Sync server settings', 'Open sync server settings', ['sync server', 'd1 sync', 'cloud sync', 'sync settings', '同步', '云同步', 'd1同步', 'tongbu', 'yuntongbu', 'tb', 'ytb'], 'options', 'storage'),
+    {
+        id: 'sync-now',
+        group: 'settings',
+        title: 'Sync now',
+        description: 'Sync AI themes',
+        keywords: ['sync now', 'd1 sync now', 'cloud sync now', '立即同步', '马上同步', 'd1同步', 'lijitongbu', 'mashangtongbu', 'ljtb', 'mstb'],
+        execute: async (_input, context) => {
+            if (!isSyncConfigured()) {
+                context.setStatusMsg({
+                    type: 'info',
+                    text: context.t('commandPalette.syncNotConfigured', 'Sync is not enabled. Configure and enable it in Storage settings first.'),
+                });
+                return true;
+            }
+            await syncNow({ syncThemes: true, applyRemoteSettings: false, pushSettings: false });
+            return true;
+        },
+    },
     createSettingsCommand('settings-desktop', 'Desktop settings', 'Open desktop app settings', ['desktop', 'electron', '桌面', '桌面端', 'zhuomian', 'zhuomianduan', 'zm', 'zmd'], 'options', 'desktop'),
     createSettingsCommand('settings-lab', 'Lab settings', 'Open experimental settings', ['lab', 'experimental', '实验', '实验室', 'shiyan', 'shiyanshi', 'sy', 'sys'], 'options', 'lab'),
-    createSettingsCommand('settings-visualizer', 'Visualizer settings', 'Open lyrics animation workbench', ['visualizer settings', 'visualizer workbench', '可视化', '歌词动画', 'keshihua', 'gecidonghua', 'ksh', 'gcdh'], 'options', 'visualizer'),
+    createSettingsCommand('settings-visualizer', 'Visualizer settings', 'Open lyrics animation workbench', ['visualizer settings', 'visualizer workbench', '可视化', '歌词动画', 'keshihua', 'gecidonghua', 'ksh', 'gcdh', 'donghua'], 'options', 'visualizer'),
     createSettingsCommand('settings-theme-park', 'Color', 'Open theme editor', ['color', 'theme park', 'theme', '配色', '主题', '主题公园', 'peise', 'zhuti', 'zhutigongyuan', 'ps', 'zt', 'ztgy'], 'options', 'themePark'),
     createSettingsCommand('settings-lyric-filter', 'Lyric filter', 'Open lyric filter settings', ['lyric filter', 'lyrics filter', '歌词过滤', '过滤', 'geciguolv', 'guolv', 'gcgl', 'gl'], 'options', 'lyricFilter'),
 
@@ -420,8 +441,36 @@ export const COMMAND_PALETTE_COMMANDS: CommandPaletteCommand[] = [
     createVisualizerCommand('fume', 'Visualizer: Fume', 'Switch to fume visualizer', ['visualizer fume', 'fume', '浮名', 'fuming', 'fm']),
     createVisualizerCommand('cappella', 'Visualizer: Cappella', 'Switch to cappella visualizer', ['visualizer cappella', 'cappella', '群唱', 'qunchang', 'qc']),
     createVisualizerCommand('tilt', 'Visualizer: Tilt', 'Switch to tilt visualizer', ['visualizer tilt', 'tilt', '倾诉', 'qingsu', 'qs']),
-    createVisualizerCommand('claddagh', 'Visualizer: Claddagh', 'Switch to Claddagh visualizer', ['visualizer claddagh', 'claddagh', '回环', 'jiezhi', 'jz']),
+    createVisualizerCommand('claddagh', 'Visualizer: Claddagh', 'Switch to Claddagh visualizer', ['visualizer claddagh', 'claddagh', '回环', 'huihuan', 'hh']),
     createVisualizerCommand('monet', 'Visualizer: Monet', 'Switch to Monet visualizer', ['visualizer monet', 'monet', '莫奈', 'monai', 'mn', '切换到可视化：莫奈', '切换到可视化莫奈']),
+    createVisualizerCommand('diorama', 'Visualizer: Diorama', 'Switch to Diorama visualizer', ['visualizer diorama', 'diorama', '镜台', 'jingtai', 'jt', '切换到可视化：镜台', '切换到可视化镜台']),
+    {
+        id: 'desktop-toggle-remote-control',
+        group: 'navigation',
+        title: 'Toggle remote control window',
+        description: 'Open or close the remote control window',
+        keywords: ['remote control', 'remote window', 'toggle remote', '遥控窗口', '切换遥控窗口', '打开遥控', 'yaokongchuangkou', 'qiehuanyaokongchuangkou', 'ykck', 'qhykck'],
+        execute: (_input, context) => context.toggleRemoteControlWindow(),
+    },
+    {
+        id: 'desktop-toggle-main-window-always-on-top',
+        group: 'navigation',
+        title: 'Toggle main window always on top',
+        description: 'Pin or unpin the main window above other windows',
+        keywords: ['always on top', 'main window on top', 'pin main window', '主窗口置顶', '切换主窗口置顶', '取消主窗口置顶', 'zhuchuangkouzhiding', 'qiehuanzhuchuangkouzhiding', 'zckzd', 'qhzckzd'],
+        execute: (_input, context) => context.toggleMainWindowAlwaysOnTop(),
+    },
+    {
+        id: 'visualizer-toggle-random-per-song',
+        group: 'visualizer',
+        title: 'Random visualizer for every song',
+        description: 'Toggle a random lyric animation mode whenever the song changes',
+        keywords: ['random visualizer', 'random animation', 'per song', '随机歌词动画', '每首歌随机动画', 'suiji geci donghua', 'meishouge suiji donghua', 'sjgcdh', 'msgsjdh'],
+        execute: (_input, context) => {
+            context.toggleRandomVisualizerModePerSong();
+            return true;
+        },
+    },
 
     {
         id: 'background-monet-full-overlay',
@@ -570,8 +619,37 @@ export const COMMAND_PALETTE_COMMANDS: CommandPaletteCommand[] = [
     createAppLanguageCommand('settings-language-system', 'system', 'Follow system language', 'Use the browser or system language', ['system language', 'follow system', 'auto language', '跟随系统', '系统语言', 'gensuixitong', 'xitongyuyan', 'gsxt', 'xtyy']),
     createAppLanguageCommand('settings-language-zh-CN', 'zh-CN', 'Switch language to Chinese', 'Use Simplified Chinese in the interface', ['chinese', 'simplified chinese', '中文', '简体中文', 'zhongwen', 'jiantizhongwen', 'zw', 'jtzw']),
     createAppLanguageCommand('settings-language-en', 'en', 'Switch language to English', 'Use English in the interface', ['english', 'interface english', '英文', 'yingwen', 'yw']),
+    createAppLanguageCommand('settings-language-in', 'in', 'Switch language to Indonesian', 'Use Bahasa Indonesia in the interface', ['indonesian', 'bahasa indonesia', 'indonesia', '印尼语', 'yinniyu', 'yny', 'bhs']),
 
 ];
+
+export const getAvailableCommandPaletteCommands = (context?: CommandPaletteContext) => COMMAND_PALETTE_COMMANDS.filter(command => {
+    if (command.id === 'settings-desktop' || command.id.startsWith('desktop-')) {
+        const isWebBrowser = typeof window !== 'undefined';
+        const isElectron = isWebBrowser && Boolean((window as any).electron);
+        if (isWebBrowser && !isElectron) {
+            return false;
+        }
+    }
+
+    if (command.id === 'playback-auto-match-best-lyric') {
+        return Boolean(context?.enableAlternativeLyricSources);
+    }
+
+    if (command.id === 'theme-generate-current') {
+        return context ? context.canGenerateAITheme && !context.isGeneratingTheme : true;
+    }
+
+    if (command.id === 'theme-quick-editor') {
+        return context ? context.canOpenThemeQuickEditor : true;
+    }
+
+    if (command.group === 'search' && command.id !== 'search-current' && context) {
+        return false;
+    }
+
+    return true;
+});
 
 export const getQueueSongMatches = (query: string, context: CommandPaletteContext): CommandPaletteMatch[] => {
     const normalizedQuery = normalize(query);
@@ -615,6 +693,7 @@ const createQueueSongCommand = (
     group: 'playback',
     title: song.name,
     description: buildQueueSongDescription(song, index, context),
+    textSource: 'runtime',
     keywords: [`#${index + 1}`],
     execute: async (_input, commandContext) => {
         await commandContext.playSong(song, commandContext.playQueue);
@@ -629,35 +708,7 @@ export const getCommandPaletteMatches = (
 ): CommandPaletteMatch[] => {
     const normalizedQuery = normalize(query);
 
-    const filteredCommands = COMMAND_PALETTE_COMMANDS.filter(command => {
-        if (command.id === 'settings-desktop') {
-            const isWebBrowser = typeof window !== 'undefined';
-            const isElectron = isWebBrowser && Boolean((window as any).electron);
-            if (isWebBrowser && !isElectron) {
-                return false;
-            }
-        }
-
-        if (command.id === 'playback-auto-match-best-lyric') {
-            return Boolean(context?.enableAlternativeLyricSources);
-        }
-
-        if (command.id === 'theme-generate-current') {
-            return context ? context.canGenerateAITheme && !context.isGeneratingTheme : true;
-        }
-
-        if (command.id === 'theme-quick-editor') {
-            return context ? context.canOpenThemeQuickEditor : true;
-        }
-
-        if (command.group === 'search') {
-            if (command.id === 'search-current') return true;
-            if (context) {
-                return false;
-            }
-        }
-        return true;
-    });
+    const filteredCommands = getAvailableCommandPaletteCommands(context);
 
     if (!normalizedQuery) {
         const recentCommands = recentCommandIds

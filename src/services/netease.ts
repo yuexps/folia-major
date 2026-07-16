@@ -664,6 +664,29 @@ export const neteaseApi = {
     return res;
   },
 
+  getAllArtistAlbums: async (id: number) => {
+    const limit = 50;
+    const albums: any[] = [];
+    const seenIds = new Set<string>();
+
+    // Follow the API's `more` flag while guarding against malformed repeated pages.
+    for (let page = 0; page < 200; page++) {
+      const res = await neteaseApi.getArtistAlbums(id, limit, page * limit);
+      const pageAlbums = Array.isArray(res?.hotAlbums) ? res.hotAlbums : [];
+      let added = 0;
+      for (const album of pageAlbums) {
+        const key = String(album?.id ?? `${page}:${added}`);
+        if (seenIds.has(key)) continue;
+        seenIds.add(key);
+        albums.push(album);
+        added++;
+      }
+      if (!res?.more || pageAlbums.length === 0 || added === 0) break;
+    }
+
+    return albums;
+  },
+
   getArtistTopSongs: async (id: number) => {
     const res = await fetchWithCreds(`/artist/top/song?id=${id}`);
     res.songs = mergeSongsWithPrivileges(res.songs, res.privileges);
@@ -743,6 +766,45 @@ export const neteaseApi = {
   // --- Radio ---
   getPersonalFm: async () => {
     return fetchWithCreds(`/personal_fm?timestamp=${Date.now()}`);
+  },
+
+  getDailyRecommendedSongs: async (afresh = false) => {
+    const res = await fetchWithCreds(`/recommend/songs?afresh=${afresh}&timestamp=${Date.now()}`);
+    const rawSongs = res.data?.dailySongs || res.data?.songs || res.recommendData?.dailySongs || res.songs || [];
+    return {
+      ...res,
+      songs: mergeSongsWithPrivileges(rawSongs, res.data?.privileges || res.privileges),
+    };
+  },
+
+  dislikeDailyRecommendedSong: async (songId: number) => {
+    const res = await fetchWithCreds(`/recommend/songs/dislike?id=${songId}&timestamp=${Date.now()}`);
+    return {
+      ...res,
+      song: res.data ? normalizeSongResult(res.data) : null,
+    };
+  },
+
+  getDailyRecommendationHistoryDates: async () => {
+    const res = await fetchWithCreds(`/history/recommend/songs?timestamp=${Date.now()}`);
+    const rawDates = res.data?.dates || res.dates || res.data || [];
+    return {
+      ...res,
+      dates: Array.isArray(rawDates)
+        ? rawDates
+          .map((item: unknown) => typeof item === 'string' ? item : (item as { date?: string })?.date)
+          .filter((date: unknown): date is string => typeof date === 'string' && date.length > 0)
+        : [],
+    };
+  },
+
+  getDailyRecommendationHistoryDetail: async (date: string) => {
+    const res = await fetchWithCreds(`/history/recommend/songs/detail?date=${encodeURIComponent(date)}&timestamp=${Date.now()}`);
+    const rawSongs = res.data?.dailySongs || res.data?.songs || res.recommendData?.dailySongs || res.songs || [];
+    return {
+      ...res,
+      songs: mergeSongsWithPrivileges(rawSongs, res.data?.privileges || res.privileges),
+    };
   },
 
   getPersonalizedPlaylists: async (limit = 35) => {

@@ -32,6 +32,7 @@ type ElectronSettingsState = {
     ENABLE_UPDATE_CHECK: boolean;
     ENABLE_AUTO_UPDATE: boolean;
     STAGE_MODE_SOURCE: string;
+    DISCORD_RICH_PRESENCE_ENABLED: boolean;
 };
 
 export type DesktopSettingsChrome = {
@@ -47,8 +48,10 @@ export type DesktopSettingsChrome = {
 
 export type DesktopSettingsPreferences = {
     hideTaskbarIcon: boolean;
+    hideRemoteControlTaskbarIcon: boolean;
     minimizeToTray: boolean;
     onToggleHideTaskbarIcon: (enabled: boolean) => void;
+    onToggleHideRemoteControlTaskbarIcon: (enabled: boolean) => void;
     onToggleMinimizeToTray: (enabled: boolean) => void;
     onToggleOpenPlayerOnLaunch: (enabled: boolean) => void;
     openPlayerOnLaunch: boolean;
@@ -95,8 +98,10 @@ const DesktopSettingsSubview: React.FC<DesktopSettingsSubviewProps> = ({
     } = chrome;
     const {
         hideTaskbarIcon,
+        hideRemoteControlTaskbarIcon,
         minimizeToTray,
         onToggleHideTaskbarIcon,
+        onToggleHideRemoteControlTaskbarIcon,
         onToggleMinimizeToTray,
         onToggleOpenPlayerOnLaunch,
         openPlayerOnLaunch,
@@ -140,12 +145,12 @@ const DesktopSettingsSubview: React.FC<DesktopSettingsSubviewProps> = ({
         <>
             <section className="space-y-4">
                 <h3 className="text-xs font-bold uppercase tracking-widest mb-3 flex items-center gap-2 opacity-60" style={{ color: 'var(--text-secondary)' }}>
-                    <Monitor size={14} className="opacity-70" /> {t('options.desktopTrayBehavior') || '桌面窗口行为'}
+                    <Monitor size={14} className="opacity-70" /> {t('options.desktopTrayBehavior')}
                 </h3>
                 <div className={`border rounded-2xl overflow-hidden ${borderColor} ${settingsCardClass}`}>
                     <div className={`p-4 bg-black/[0.04] dark:bg-white/[0.02] border-b ${borderColor}`}>
                         <p className="text-xs opacity-60 leading-relaxed text-left" style={{ color: 'var(--text-secondary)' }}>
-                            {t('options.desktopTrayBehaviorDesc') || '仅桌面端生效。可控制最小化到托盘、隐藏任务栏图标，以及启动时是否直接进入播放页。'}
+                            {t('options.desktopTrayBehaviorDesc')}
                         </p>
                     </div>
 
@@ -156,7 +161,7 @@ const DesktopSettingsSubview: React.FC<DesktopSettingsSubviewProps> = ({
                             </div>
                             <div className="space-y-0.5 text-left">
                                 <h4 className="text-sm font-semibold leading-none" style={{ color: 'var(--text-primary)' }}>
-                                    {t('options.minimizeToTray') || '最小化到托盘'}
+                                    {t('options.minimizeToTray')}
                                 </h4>
                                 <p className="text-xs opacity-50 leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
                                     点击最小化时，应用将隐藏至系统托盘。
@@ -173,7 +178,7 @@ const DesktopSettingsSubview: React.FC<DesktopSettingsSubviewProps> = ({
                             </div>
                             <div className="space-y-0.5 text-left">
                                 <h4 className="text-sm font-semibold leading-none" style={{ color: 'var(--text-primary)' }}>
-                                    {t('options.openPlayerOnLaunch') || '启动后直接进入播放页'}
+                                    {t('options.openPlayerOnLaunch')}
                                 </h4>
                                 <p className="text-xs opacity-50 leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
                                     应用启动时自动开启全屏/大屏歌词播放界面，无需手动点击。
@@ -183,14 +188,14 @@ const DesktopSettingsSubview: React.FC<DesktopSettingsSubviewProps> = ({
                         {renderToggle(openPlayerOnLaunch, () => onToggleOpenPlayerOnLaunch(!openPlayerOnLaunch))}
                     </div>
 
-                    <div className="flex items-center justify-between p-4 gap-4 hover:bg-black/[0.01] dark:hover:bg-white/[0.01] transition-colors">
+                    <div className={`flex items-center justify-between p-4 gap-4 hover:bg-black/[0.01] dark:hover:bg-white/[0.01] transition-colors border-b ${borderColor}`}>
                         <div className="flex items-start gap-3 min-w-0">
                             <div className={`w-9 h-9 rounded-xl border flex items-center justify-center shrink-0 ${settingsIconClass}`} style={{ color: 'var(--text-primary)' }}>
                                 <EyeOff size={16} />
                             </div>
                             <div className="space-y-0.5 text-left">
                                 <h4 className="text-sm font-semibold leading-none" style={{ color: 'var(--text-primary)' }}>
-                                    {t('options.hideTaskbarIcon') || '隐藏任务栏图标'}
+                                    {t('options.hideTaskbarIcon')}
                                 </h4>
                                 <p className="text-xs opacity-50 leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
                                     即使主窗口处于打开状态，也不在系统任务栏显示应用，最大程度减少干扰。
@@ -198,6 +203,22 @@ const DesktopSettingsSubview: React.FC<DesktopSettingsSubviewProps> = ({
                             </div>
                         </div>
                         {renderToggle(hideTaskbarIcon, () => onToggleHideTaskbarIcon(!hideTaskbarIcon))}
+                    </div>
+                    <div className="flex items-center justify-between p-4 gap-4 hover:bg-black/[0.01] dark:hover:bg-white/[0.01] transition-colors">
+                        <div className="flex items-start gap-3 min-w-0">
+                            <div className={`w-9 h-9 rounded-xl border flex items-center justify-center shrink-0 ${settingsIconClass}`} style={{ color: 'var(--text-primary)' }}>
+                                <EyeOff size={16} />
+                            </div>
+                            <div className="space-y-0.5 text-left">
+                                <h4 className="text-sm font-semibold leading-none" style={{ color: 'var(--text-primary)' }}>
+                                    {t('options.hideRemoteControlTaskbarIcon')}
+                                </h4>
+                                <p className="text-xs opacity-50 leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                                    {t('options.hideRemoteControlTaskbarIconDesc')}
+                                </p>
+                            </div>
+                        </div>
+                        {renderToggle(hideRemoteControlTaskbarIcon, () => onToggleHideRemoteControlTaskbarIcon(!hideRemoteControlTaskbarIcon))}
                     </div>
                 </div>
 
@@ -282,14 +303,14 @@ const DesktopSettingsSubview: React.FC<DesktopSettingsSubviewProps> = ({
                         <div className="flex items-center gap-2">
                             <AlertCircle size={16} className="text-amber-500 shrink-0" />
                             <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-                                发现新版本 v{updateStatus.availableVersion}
+                                {t('options.newVersionFound', { version: updateStatus.availableVersion })}
                             </span>
                         </div>
 
                         {/* 自动更新时的提示 */}
                         {electronSettings.ENABLE_AUTO_UPDATE && updateStatus.status === 'downloading' && (
                             <div className="text-xs text-left text-zinc-400">
-                                新版本正在后台自动下载，下载完成后将提示您重启安装。
+                                {t('options.autoUpdateGithubNotice')}
                             </div>
                         )}
 
@@ -298,7 +319,7 @@ const DesktopSettingsSubview: React.FC<DesktopSettingsSubviewProps> = ({
                             <div className="space-y-2">
                                 <div className="flex items-center justify-between text-xs font-mono">
                                     <span className="opacity-60 text-left" style={{ color: 'var(--text-secondary)' }}>
-                                        正在下载更新...
+                                        {t('options.downloadUpdate')}
                                     </span>
                                     <span className="font-semibold text-emerald-400">
                                         {Math.round(updateStatus.downloadProgress.percent)}%
@@ -335,7 +356,7 @@ const DesktopSettingsSubview: React.FC<DesktopSettingsSubviewProps> = ({
                                 style={{ color: 'var(--text-primary)' }}
                             >
                                 <ExternalLink size={14} />
-                                {t('options.downloadChina') || 'CN Download'}
+                                {t('options.downloadChina')}
                             </button>
                             {!electronSettings.ENABLE_AUTO_UPDATE && (
                                 <button

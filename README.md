@@ -14,14 +14,14 @@ Lyrics Reimagined // 辞曲新境
 [![GitHub stars](https://img.shields.io/github/stars/chthollyphile/folia-major?style=social)](https://github.com/chthollyphile/folia-major/stargazers)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D18-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
 <!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
-[![All Contributors](https://img.shields.io/badge/all_contributors-22-orange.svg?style=flat-square)](#contributors-)
+[![All Contributors](https://img.shields.io/badge/all_contributors-29-orange.svg?style=flat-square)](#contributors-)
 <!-- ALL-CONTRIBUTORS-BADGE:END -->
 
-[桌面版下载](https://github.com/chthollyphile/folia-major/releases)
+[获取方式](https://github.com/chthollyphile/folia-major#%E8%8E%B7%E5%8F%96%E6%96%B9%E5%BC%8F)
 ·
 [Vercel 部署](https://vercel.com/new/clone?repository-url=https://github.com/chthollyphile/folia-major)
 ·
-[使用指南](https://folia-site.vercel.app/guide/)
+[使用指南](https://folia-site.cielaniska.top/guide/)
 ·
 [技术说明](docs/technical.md)
 
@@ -31,9 +31,9 @@ Lyrics Reimagined // 辞曲新境
 
 Folia是一个以全屏沉浸式歌词播放为核心的在线音乐播放器，支持网易云，navidrome和本地音乐库，通过智能歌词匹配，AI生成配色主题，以及多种全屏歌词动画为用户提供独特的听歌体验。
 
-如果你希望直接开箱即用，马上体验，推荐直接使用基于Electron的 windows/ macOS/ Linux 桌面端版本。
+提供基于Electron的 windows/ macOS/ Linux 桌面端版本与基于 Node.js 的 Web 版本，支持多平台部署。
 
-如果希望能够在移动设备上使用，或在浏览器上体验云端多平台，可以选择[一键部署到 Vercel](https://folia-site.vercel.app/guide/deploy-vercel) 的 Web 版本，或自行部署到其他支持 Node.js 的平台。
+如果希望能够在移动设备上使用，或在浏览器上体验，可以选择[一键部署到 Vercel](https://folia-site.cielaniska.top/guide/deploy-vercel) 的 Web 版本，或自行部署到其他支持 Node.js 的平台。
 
 ## 展示
 
@@ -98,21 +98,37 @@ https://github.com/user-attachments/assets/704f195a-2194-434b-86e8-8f36290e5cc4
 | AI 主题生成 | 基于歌曲情绪与歌词内容生成沉浸式背景与视觉参数。 |
 | 多端体验 | 提供 Web 部署方式，同时支持桌面端打包分发。 |
 
-## 桌面端下载
+## 获取方式
 
-桌面版内置前后端运行环境，适合希望即装即用的用户。最新版本请前往 [Releases 页面](https://github.com/chthollyphile/folia-major/releases)。
+桌面版内置前后端运行环境，适合希望即装即用的用户。
+
+- **Windows / macOS / Linux**: 最新版本的安装包请前往 [Releases 页面](https://github.com/chthollyphile/folia-major/releases) 下载。
+- **Arch Linux**: 可通过 AUR 获取 [folia-major-bin](https://aur.archlinux.org/packages/folia-major-bin)。
+- **Flatpak**: 社区提供的第三方 flatpak，详情见 [Flatpark](https://flatpark.org/apps/top.izuna.foliamajor/)。
 
 Linux 包、Wayland / Hyprland 遥控窗和桌面端细节见 [技术与开发说明](docs/technical.md)。
 
 ## 文档与开发
 
-更完整的使用说明请访问 [Folia Guide](https://folia-site.vercel.app/guide/)。
+更完整的使用说明请访问 [Folia Guide](https://folia-site.cielaniska.top/guide/)。
 
 部署、环境变量、本地开发、Stage API、常用脚本和技术栈见 [技术与开发说明](docs/technical.md)。
 
-如果你希望快速上线 Web 版本，请阅读 [Vercel 一键部署指南](https://folia-site.vercel.app/guide/deploy-vercel) 来创建项目
+如果你希望快速上线 Web 版本，请阅读 [Vercel 一键部署指南](https://folia-site.cielaniska.top/guide/deploy-vercel) 来创建项目
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/chthollyphile/folia-major)
+
+## Sync Server
+
+Folia 提供了可选的官方同步服务端 `sync-server`，用于在多个设备之间同步外观设置与 AI 主题库。服务端由用户自行托管，适合希望跨设备同步配色主题的用户。
+
+支持以下部署方式：
+
+- **Cloudflare Workers / D1**：免服务器运维的 Serverless 部署，推荐使用。
+- **Docker**：适合已有服务器或 VPS 的用户。
+- **Node.js 自托管**：使用 SQLite，适合本地或不方便使用 Docker 的环境。
+
+详细的环境变量、Token 配置与部署步骤请参阅 [`sync-server/README.md`](sync-server/README.md)。部署完成后，在 Folia 的“存储设置”中填写服务端地址和 `SYNC_TOKEN` 即可启用同步。
 
 ## 本地音乐与匹配说明
 
@@ -163,6 +179,15 @@ Thanks goes to these wonderful people. Issue reports, bug reports, ideas, docs, 
     </tr>
     <tr>
       <td align="center" valign="top" width="14.28%"><a href="https://bit.ly/howlingFounts"><img src="https://avatars.githubusercontent.com/u/43498546?v=4?s=100" width="100px;" alt="嗷呜风字"/><br /><sub><b>嗷呜风字</b></sub></a><br /><a href="#ideas-howlingFounts" title="Ideas, Planning, & Feedback">🤔</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/Jirankun"><img src="https://avatars.githubusercontent.com/u/174584819?v=4?s=100" width="100px;" alt="Zhyllan Fyllah"/><br /><sub><b>Zhyllan Fyllah</b></sub></a><br /><a href="https://github.com/chthollyphile/folia-major/commits?author=Jirankun" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/ROYI-Jiang"><img src="https://avatars.githubusercontent.com/u/124415415?v=4?s=100" width="100px;" alt="ROYI-Jiang"/><br /><sub><b>ROYI-Jiang</b></sub></a><br /><a href="#ideas-ROYI-Jiang" title="Ideas, Planning, & Feedback">🤔</a> <a href="https://github.com/chthollyphile/folia-major/issues?q=author%3AROYI-Jiang" title="Bug reports">🐛</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/lhtstudy"><img src="https://avatars.githubusercontent.com/u/91039875?v=4?s=100" width="100px;" alt="LHT"/><br /><sub><b>LHT</b></sub></a><br /><a href="https://github.com/chthollyphile/folia-major/issues?q=author%3Alhtstudy" title="Bug reports">🐛</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/SXP-Simon"><img src="https://avatars.githubusercontent.com/u/177809507?v=4?s=100" width="100px;" alt="Helian Nuits"/><br /><sub><b>Helian Nuits</b></sub></a><br /><a href="https://github.com/chthollyphile/folia-major/commits?author=SXP-Simon" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/LXiTong"><img src="https://avatars.githubusercontent.com/u/77535614?v=4?s=100" width="100px;" alt="Kuroneko"/><br /><sub><b>Kuroneko</b></sub></a><br /><a href="#ideas-LXiTong" title="Ideas, Planning, & Feedback">🤔</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/AZURE-HUAI"><img src="https://avatars.githubusercontent.com/u/247430394?v=4?s=100" width="100px;" alt="浮梦怀生"/><br /><sub><b>浮梦怀生</b></sub></a><br /><a href="https://github.com/chthollyphile/folia-major/commits?author=AZURE-HUAI" title="Code">💻</a></td>
+    </tr>
+    <tr>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/LucasLeungKoi"><img src="https://avatars.githubusercontent.com/u/104263817?v=4?s=100" width="100px;" alt="Lucas"/><br /><sub><b>Lucas</b></sub></a><br /><a href="https://github.com/chthollyphile/folia-major/commits?author=LucasLeungKoi" title="Code">💻</a> <a href="https://github.com/chthollyphile/folia-major/issues?q=author%3ALucasLeungKoi" title="Bug reports">🐛</a></td>
     </tr>
   </tbody>
 </table>

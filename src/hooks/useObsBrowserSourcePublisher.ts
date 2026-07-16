@@ -8,6 +8,7 @@ import type {
     CadenzaTuning,
     ClassicTuning,
     CladdaghTuning,
+    DioramaTuning,
     FumeTuning,
     LyricData,
     MonetBackgroundImage,
@@ -31,7 +32,15 @@ import type {
     ObsBrowserSourceConfig,
     ObsBrowserSourceStatus,
 } from '../types/obsBrowserSource';
-import { downsampleObsSpectrum, isObsBrowserSourceBlobCoverUrl, resolveObsBrowserSourceClockTime, resolveObsBrowserSourceCoverUrl } from '../utils/obsBrowserSource';
+import {
+    downsampleObsSpectrum,
+    isObsBrowserSourceBlobCoverUrl,
+    resolveObsBrowserSourceClockTime,
+    resolveObsBrowserSourceCoverUrl,
+    resolveObsBrowserSourceImageAsset,
+    resolveObsBrowserSourceImageAssets,
+} from '../utils/obsBrowserSource';
+import type { VisualizerTuningBundle } from '../components/visualizer/tuningRegistry';
 
 // src/hooks/useObsBrowserSourcePublisher.ts
 // Publishes the single playback surface to the local OBS browser source.
@@ -55,6 +64,7 @@ type UseObsBrowserSourcePublisherOptions = {
     subtitleTheme?: Theme;
     isDaylight: boolean;
     visualizerMode: VisualizerMode;
+    visualizerTunings?: VisualizerTuningBundle;
     visualizerBackgroundMode: VisualizerBackgroundMode | null;
     lyricsFontScale: number;
     backgroundOpacity: number;
@@ -70,17 +80,9 @@ type UseObsBrowserSourcePublisherOptions = {
     seed: string | number;
     audioPower: MotionValue<number>;
     audioBands: AudioBands;
-    classicTuning?: ClassicTuning;
-    cadenzaTuning?: CadenzaTuning;
-    partitaTuning?: PartitaTuning;
-    fumeTuning?: FumeTuning;
-    claddaghTuning?: CladdaghTuning;
-    cappellaTuning?: CappellaTuning;
     cappellaCustomEmojiImages?: CappellaEmojiImage[];
     cappellaCustomAvatarImages?: CappellaAvatarImage[];
-    tiltTuning?: TiltTuning;
     monetBackgroundTuning?: MonetBackgroundTuning;
-    monetTuning?: MonetTuning;
     monetBackgroundImage?: MonetBackgroundImage | null;
     monetPortraitImage?: MonetPortraitImage | null;
     urlBackgroundList?: UrlBackgroundItem[];
@@ -118,6 +120,7 @@ export const useObsBrowserSourcePublisher = ({
     subtitleTheme,
     isDaylight,
     visualizerMode,
+    visualizerTunings,
     visualizerBackgroundMode,
     lyricsFontScale,
     backgroundOpacity,
@@ -133,17 +136,9 @@ export const useObsBrowserSourcePublisher = ({
     seed,
     audioPower,
     audioBands,
-    classicTuning,
-    cadenzaTuning,
-    partitaTuning,
-    fumeTuning,
-    claddaghTuning,
-    cappellaTuning,
     cappellaCustomEmojiImages,
     cappellaCustomAvatarImages,
-    tiltTuning,
     monetBackgroundTuning,
-    monetTuning,
     monetBackgroundImage,
     monetPortraitImage,
     urlBackgroundList,
@@ -151,6 +146,12 @@ export const useObsBrowserSourcePublisher = ({
 }: UseObsBrowserSourcePublisherOptions) => {
     const [status, setStatus] = useState<ObsBrowserSourceStatus>(() => emptyObsStatus());
     const [obsCoverUrl, setObsCoverUrl] = useState<string | null>(coverUrl);
+    const [obsCustomImages, setObsCustomImages] = useState<{
+        cappellaEmoji: CappellaEmojiImage[];
+        cappellaAvatar: CappellaAvatarImage[];
+        monetBackground: MonetBackgroundImage | null;
+        monetPortrait: MonetPortraitImage | null;
+    }>({ cappellaEmoji: [], cappellaAvatar: [], monetBackground: null, monetPortrait: null });
     const isExternallyRendering = status.enabled && status.clientCount > 0;
     const lastPublishedClockRef = useRef<ObsBrowserSourceClock | null>(null);
     const lastClockPublishMsRef = useRef(0);
@@ -200,6 +201,30 @@ export const useObsBrowserSourcePublisher = ({
         };
     }, [coverUrl]);
 
+    useEffect(() => {
+        let cancelled = false;
+
+        void Promise.all([
+            resolveObsBrowserSourceImageAssets(cappellaCustomEmojiImages),
+            resolveObsBrowserSourceImageAssets(cappellaCustomAvatarImages),
+            monetBackgroundImage ? resolveObsBrowserSourceImageAsset(monetBackgroundImage) : null,
+            monetPortraitImage ? resolveObsBrowserSourceImageAsset(monetPortraitImage) : null,
+        ]).then(([cappellaEmoji, cappellaAvatar, monetBackground, monetPortrait]) => {
+            if (!cancelled) {
+                setObsCustomImages({ cappellaEmoji, cappellaAvatar, monetBackground, monetPortrait });
+            }
+        }).catch(error => {
+            console.warn('[OBS] Failed to resolve custom images for browser source', error);
+            if (!cancelled) {
+                setObsCustomImages({ cappellaEmoji: [], cappellaAvatar: [], monetBackground: null, monetPortrait: null });
+            }
+        });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [cappellaCustomAvatarImages, cappellaCustomEmojiImages, monetBackgroundImage, monetPortraitImage]);
+
     const config = useMemo<ObsBrowserSourceConfig>(() => ({
         activePlaybackContext,
         stageSource,
@@ -213,6 +238,7 @@ export const useObsBrowserSourcePublisher = ({
         subtitleTheme,
         isDaylight,
         visualizerMode,
+        visualizerTunings,
         visualizerBackgroundMode,
         lyricsFontScale,
         backgroundOpacity,
@@ -226,59 +252,41 @@ export const useObsBrowserSourcePublisher = ({
         hideTranslationSubtitle,
         showSubtitleTranslation,
         seed,
-        classicTuning,
-        cadenzaTuning,
-        partitaTuning,
-        fumeTuning,
-        claddaghTuning,
-        cappellaTuning,
-        cappellaCustomEmojiImages,
-        cappellaCustomAvatarImages,
-        tiltTuning,
+        cappellaCustomEmojiImages: obsCustomImages.cappellaEmoji,
+        cappellaCustomAvatarImages: obsCustomImages.cappellaAvatar,
         monetBackgroundTuning,
-        monetTuning,
-        monetBackgroundImage,
-        monetPortraitImage,
+        monetBackgroundImage: obsCustomImages.monetBackground,
+        monetPortraitImage: obsCustomImages.monetPortrait,
         urlBackgroundList,
         urlBackgroundSelectedId,
         updatedAt: Date.now(),
     }), [
         activePlaybackContext,
         backgroundOpacity,
-        cappellaCustomAvatarImages,
-        cappellaCustomEmojiImages,
-        cappellaTuning,
-        cadenzaTuning,
-        claddaghTuning,
-        classicTuning,
         currentSong,
         disableGeometricBackground,
         disableVignette,
-        fumeTuning,
         hideTranslationSubtitle,
         showSubtitleTranslation,
         isDaylight,
         lyrics,
         lyricsFontScale,
-        monetBackgroundImage,
         monetBackgroundTuning,
-        monetPortraitImage,
-        monetTuning,
+        obsCustomImages,
         obsCoverUrl,
-        partitaTuning,
         seed,
         stageSource,
         staticMode,
         subtitleOverlayOpacity,
         theme,
         subtitleTheme,
-        tiltTuning,
         transparentBackground,
         urlBackgroundList,
         urlBackgroundSelectedId,
         useCoverColorBg,
         visualizerBackgroundMode,
         visualizerMode,
+        visualizerTunings,
         visualizerOpacity,
     ]);
 

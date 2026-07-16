@@ -3,6 +3,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('electron', {
     getSettings: () => ipcRenderer.invoke('get-settings'),
     saveSettings: (key, value) => ipcRenderer.invoke('save-settings', key, value),
+    setAppLocale: (localeKey) => ipcRenderer.invoke('set-app-locale', localeKey),
     getCacheDirectory: () => ipcRenderer.invoke('get-cache-directory'),
     chooseCacheDirectory: () => ipcRenderer.invoke('choose-cache-directory'),
     resetCacheDirectory: () => ipcRenderer.invoke('reset-cache-directory'),
@@ -89,6 +90,7 @@ contextBridge.exposeInMainWorld('electron', {
         return () => ipcRenderer.removeListener('thumbar-action', listener);
     },
     openRemoteControl: () => ipcRenderer.invoke('remote-control-open'),
+    toggleRemoteControl: () => ipcRenderer.invoke('remote-control-toggle'),
     closeRemoteControl: () => ipcRenderer.invoke('remote-control-close'),
     getRemoteControlAlwaysOnTop: () => ipcRenderer.invoke('remote-control-get-always-on-top'),
     setRemoteControlAlwaysOnTop: (alwaysOnTop) => ipcRenderer.invoke('remote-control-set-always-on-top', alwaysOnTop),

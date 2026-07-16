@@ -294,7 +294,7 @@ const GridViewOverlayHost: React.FC<GridViewOverlayHostProps> = ({ legacyProps, 
         if (!selectedCollection) return;
 
         const source = selectedCollection.source;
-        const albumName = album?.name || '专辑';
+        const albumName = album?.name || '';
         const albumCoverUrl = album?.coverImgUrl || album?.coverUrl || album?.picUrl;
         if (source === 'netease') {
             handlePushCollection({
@@ -535,7 +535,6 @@ const GridViewOverlayHost: React.FC<GridViewOverlayHostProps> = ({ legacyProps, 
             },
             onRemovePlaylistSongs: async (playlistId, songIds) => {
                 await removeSongsFromLocalPlaylist(playlistId, songIds);
-                legacyProps.onRefreshLocalSongs();
             },
         },
         navidrome: {
@@ -591,7 +590,16 @@ const GridViewOverlayHost: React.FC<GridViewOverlayHostProps> = ({ legacyProps, 
 
     return (
         <>
-            {children(openGridView)}
+            <div
+                className="absolute inset-0"
+                aria-hidden={Boolean(selectedCollection)}
+                style={{
+                    visibility: selectedCollection ? 'hidden' : 'visible',
+                    pointerEvents: selectedCollection ? 'none' : 'auto',
+                }}
+            >
+                {children(openGridView)}
+            </div>
             <AnimatePresence initial={false}>
                 {selectedCollection && (
                     <motion.div
@@ -640,14 +648,14 @@ const GridViewOverlayHost: React.FC<GridViewOverlayHostProps> = ({ legacyProps, 
                                     handlePushCollection({
                                         source: 'netease',
                                         id: Number(artistId),
-                                        name: '歌手',
+                                        name: String(artistId),
                                         type: 'artist',
                                     });
                                 } else if (source === 'navidrome') {
                                     handlePushCollection({
                                         source: 'navidrome',
                                         id: String(artistId),
-                                        name: '歌手',
+                                        name: String(artistId),
                                         type: 'artist',
                                     });
                                 } else if (source === 'local') {
@@ -663,6 +671,7 @@ const GridViewOverlayHost: React.FC<GridViewOverlayHostProps> = ({ legacyProps, 
                             }}
                             currentUserId={legacyProps.user?.userId}
                             onPlaylistMutated={legacyProps.onRefreshUser}
+                            onStatusMessage={legacyProps.onStatusMessage}
                             externalTracks={externalTracks}
                             externalTracksLoading={externalTracksLoading}
                             sourceActions={sourceActions}

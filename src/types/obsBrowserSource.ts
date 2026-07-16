@@ -5,6 +5,7 @@ import type {
     CadenzaTuning,
     ClassicTuning,
     CladdaghTuning,
+    DioramaTuning,
     FumeTuning,
     LyricData,
     MonetBackgroundImage,
@@ -21,6 +22,7 @@ import type {
     VisualizerBackgroundMode,
     VisualizerMode,
 } from '../types';
+import type { VisualizerTuningBundle } from '../components/visualizer/tuningRegistry';
 
 // src/types/obsBrowserSource.ts
 // Shared contracts for the local OBS browser source renderer.
@@ -46,6 +48,7 @@ export interface ObsBrowserSourceConfig {
     subtitleTheme?: Theme;
     isDaylight: boolean;
     visualizerMode: VisualizerMode;
+    visualizerTunings?: VisualizerTuningBundle;
     visualizerBackgroundMode: VisualizerBackgroundMode | null;
     lyricsFontScale: number;
     backgroundOpacity: number;
@@ -59,17 +62,9 @@ export interface ObsBrowserSourceConfig {
     hideTranslationSubtitle: boolean;
     showSubtitleTranslation?: boolean;
     seed: string | number;
-    classicTuning?: ClassicTuning;
-    cadenzaTuning?: CadenzaTuning;
-    partitaTuning?: PartitaTuning;
-    fumeTuning?: FumeTuning;
-    claddaghTuning?: CladdaghTuning;
-    cappellaTuning?: CappellaTuning;
     cappellaCustomEmojiImages?: CappellaEmojiImage[];
     cappellaCustomAvatarImages?: CappellaAvatarImage[];
-    tiltTuning?: TiltTuning;
     monetBackgroundTuning?: MonetBackgroundTuning;
-    monetTuning?: MonetTuning;
     monetBackgroundImage?: MonetBackgroundImage | null;
     monetPortraitImage?: MonetPortraitImage | null;
     urlBackgroundList?: UrlBackgroundItem[];

@@ -1,8 +1,9 @@
 import React from 'react';
-import { Sparkles, Type, MousePointerClick, Zap } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { UserGuideTipCard } from './UserGuideTipCard';
 import { UserGuideFeatureCard } from './UserGuideFeatureCard';
+import { NEW_FEATURES_RELEASE } from './newFeaturesRelease';
 
 export type NewFeaturesIntroProps = {
     isDaylight: boolean;
@@ -37,39 +38,21 @@ export const NewFeaturesIntro: React.FC<NewFeaturesIntroProps> = ({ isDaylight, 
                     icon={Sparkles}
                     iconClassName={isDaylight ? 'text-blue-500' : 'text-blue-400'}
                     title={t('userGuide.title', '欢迎使用 Folia')}
-                    description="以下是新版本功能与改进"
+                    description={t(`${NEW_FEATURES_RELEASE.i18nKey}.intro`)}
                 />
             </div>
 
-            <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-3 overflow-y-auto custom-scrollbar pr-2 pb-2">
-                <UserGuideFeatureCard
-                    {...featureCardClasses}
-                    icon={Sparkles}
-                    iconClassName={isDaylight ? 'text-indigo-500' : 'text-indigo-400'}
-                    title="全新动效与背景"
-                    description="新增了回环动效以及星空背景，带来更沉浸的视觉体验。"
-                />
-                <UserGuideFeatureCard
-                    {...featureCardClasses}
-                    icon={MousePointerClick}
-                    iconClassName={isDaylight ? 'text-rose-500' : 'text-rose-400'}
-                    title="莫奈歌词交互升级"
-                    description="莫奈歌词界面现已支持鼠标滚轮滚动查看，并可点击歌词直接跳转播放进度。"
-                />
-                <UserGuideFeatureCard
-                    {...featureCardClasses}
-                    icon={Type}
-                    iconClassName={isDaylight ? 'text-purple-500' : 'text-purple-400'}
-                    title="字体设置增强"
-                    description="支持自定义字体回退栈（Font Stack），并可以为字幕配置完全独立的字体。"
-                />
-                <UserGuideFeatureCard
-                    {...featureCardClasses}
-                    icon={Zap}
-                    iconClassName={isDaylight ? 'text-amber-500' : 'text-amber-400'}
-                    title="歌词样式快速入口"
-                    description="在控制面板新增快捷入口，可直接打开 Visualizer Playground 调整歌词与动效样式。"
-                />
+            <div className="mt-5 grid min-h-0 max-h-[min(50vh,32rem)] flex-1 grid-cols-2 gap-3 overflow-y-auto custom-scrollbar pr-2 pb-2">
+                {NEW_FEATURES_RELEASE.features.map((feature) => (
+                    <UserGuideFeatureCard
+                        key={feature.id}
+                        {...featureCardClasses}
+                        icon={feature.icon}
+                        iconClassName={isDaylight ? feature.daylightIconClassName : feature.darkIconClassName}
+                        title={t(`${NEW_FEATURES_RELEASE.i18nKey}.${feature.id}.title`)}
+                        description={t(`${NEW_FEATURES_RELEASE.i18nKey}.${feature.id}.description`)}
+                    />
+                ))}
             </div>
         </div>
     );

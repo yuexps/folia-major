@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateActio
 import { generateThemeFromLyrics, isMissingAiApiKeyError } from '../services/gemini';
 import { saveToCache } from '../services/db';
 import { DualTheme, LyricData, SongResult, StatusMessage, Theme, ThemeMode } from '../types';
-import { getCachedThemeState, getLastDualTheme, getLastLegacyTheme, type ThemeCacheSongKey } from '../services/themeCache';
+import { getCachedThemeState, getCachedThemeStateForSong, getLastDualTheme, getLastLegacyTheme, type ThemeCacheSongKey } from '../services/themeCache';
+import { saveSyncedThemeForSong } from '../services/sync/syncRepository';
 import {
     applyStoredAnimationIntensityToDualTheme,
     applyStoredAnimationIntensityToTheme,
@@ -42,6 +43,13 @@ export type GenerateAIThemeResult =
     | { status: 'failed' };
 
 const CUSTOM_DUAL_THEME_KEY = 'custom_dual_theme';
+
+// Keeps local theme operations successful when the optional sync server is unavailable.
+const saveSyncedThemeWithoutBlocking = (...args: Parameters<typeof saveSyncedThemeForSong>) => {
+    void saveSyncedThemeForSong(...args).catch((error) => {
+        console.warn('[sync] Failed to upload theme:', error);
+    });
+};
 const CUSTOM_THEME_PREFERRED_KEY = 'custom_theme_preferred';
 
 const sanitizeCustomTheme = (
@@ -163,6 +171,7 @@ export function useThemeController({
     const [bgMode, setBgMode] = useState<ThemeMode>(() => (
         initialCustomTheme && initialThemePreferenceState.isCustomThemePreferred ? 'custom' : 'default'
     ));
+    const [currentSongHasLocalAiTheme, setCurrentSongHasLocalAiTheme] = useState(false);
     const [isGeneratingTheme, setIsGeneratingTheme] = useState(false);
     const activeThemeGenerationCountRef = useRef(0);
     const themeGenerationSongKeysRef = useRef(new Set<string>());
@@ -175,7 +184,8 @@ export function useThemeController({
         isDaylight,
         defaultTheme,
         daylightTheme,
-    }), [aiTheme, bgMode, customTheme, daylightTheme, defaultTheme, isDaylight, legacyTheme]);
+        currentSongHasLocalAiTheme,
+    }), [aiTheme, bgMode, customTheme, daylightTheme, defaultTheme, isDaylight, legacyTheme, currentSongHasLocalAiTheme]);
 
     const getPreferenceSwitchState = (): ThemePreferenceSwitchState => ({
         isCustomThemePreferred,
@@ -293,7 +303,7 @@ export function useThemeController({
         setBgMode('default');
         setStatusMsg({
             type: 'success',
-            text: `已应用默认主题: ${isDaylight ? 'Daylight Default' : 'Midnight Default'}`,
+            text: t('notifications.appliedDefaultTheme', { themeName: isDaylight ? 'Daylight Default' : 'Midnight Default' }),
         });
     };
 
@@ -381,19 +391,27 @@ export function useThemeController({
         setBgMode('custom');
         setStatusMsg({
             type: 'success',
-            text: `已保存并应用自定义主题: ${getSelectedDualTheme(sanitized, isDaylight).name}`,
+            text: t('notifications.savedCustomTheme', { themeName: getSelectedDualTheme(sanitized, isDaylight).name }),
         });
         return sanitized;
     };
 
-    const saveEditedAiDualTheme = (dualTheme: DualTheme, songKey?: ThemeCacheSongKey | null) => {
+    const saveEditedAiDualTheme = (
+        dualTheme: DualTheme,
+        songOrKey?: SongResult | ThemeCacheSongKey | null,
+    ) => {
         const sanitized = applyStoredAnimationIntensityToDualTheme(sanitizeDualTheme(dualTheme));
         setLegacyTheme(null);
         setAiTheme(sanitized);
         setBgMode('ai');
         void saveToCache('last_dual_theme', sanitized);
+        const syncSong = songOrKey && typeof songOrKey === 'object' ? songOrKey : null;
+        const songKey = syncSong?.id ?? songOrKey;
         if (songKey != null) {
             void saveToCache(`dual_theme_${songKey}`, sanitized);
+        }
+        if (syncSong) {
+            saveSyncedThemeWithoutBlocking(syncSong, sanitized, 'edited');
         }
         setStatusMsg({
             type: 'success',
@@ -410,7 +428,7 @@ export function useThemeController({
         setBgMode('custom');
         setStatusMsg({
             type: 'success',
-            text: `已应用自定义主题: ${getSelectedDualTheme(customTheme, isDaylight).name}`,
+            text: t('notifications.appliedCustomTheme', { themeName: getSelectedDualTheme(customTheme, isDaylight).name }),
         });
     };
 
@@ -426,7 +444,7 @@ export function useThemeController({
 
         setStatusMsg({
             type: 'info',
-            text: enabled ? '已开启优先使用自定义主题' : '已关闭优先使用自定义主题',
+            text: t('notifications.' + (enabled ? 'customThemePreferredOn' : 'customThemePreferredOff')),
         });
     };
 
@@ -434,7 +452,7 @@ export function useThemeController({
         applyPreferenceSwitchState(resolveSongThemeAutoSwitchChange(getPreferenceSwitchState(), enabled));
         setStatusMsg({
             type: 'info',
-            text: enabled ? '已开启主题自动切换' : '已关闭主题自动切换',
+            text: t('notifications.' + (enabled ? 'autoSwitchThemeOn' : 'autoSwitchThemeOff')),
         });
     };
 
@@ -442,7 +460,7 @@ export function useThemeController({
         applyPreferenceSwitchState(resolveSongThemeAutoGenerateChange(getPreferenceSwitchState(), enabled));
         setStatusMsg({
             type: 'info',
-            text: enabled ? '已开启播放歌曲主题自动生成' : '已关闭播放歌曲主题自动生成',
+            text: t('notifications.' + (enabled ? 'autoGenerateThemeOn' : 'autoGenerateThemeOff')),
         });
     };
 
@@ -475,7 +493,7 @@ export function useThemeController({
     };
 
     const restoreCachedThemeForSong = async (
-        songId: ThemeCacheSongKey,
+        songOrId: ThemeCacheSongKey | SongResult,
         options?: { allowLastUsedFallback?: boolean; preserveCurrentOnMiss?: boolean }
     ) => {
         if (!songThemeAutoSwitchEnabled) {
@@ -485,17 +503,23 @@ export function useThemeController({
             return 'restored' as const;
         }
 
-        const cachedTheme = await getCachedThemeState(songId);
+        const cachedTheme = typeof songOrId === 'object'
+            ? await getCachedThemeStateForSong(songOrId)
+            : await getCachedThemeState(songOrId);
 
         if (cachedTheme.kind === 'dual') {
+            setCurrentSongHasLocalAiTheme(true);
             applyDualTheme(cachedTheme.theme, { respectCustomPreference: false });
             return 'dual' as const;
         }
 
         if (cachedTheme.kind === 'legacy') {
+            setCurrentSongHasLocalAiTheme(true);
             applyLegacyTheme(cachedTheme.theme, { respectCustomPreference: false });
             return 'legacy' as const;
         }
+
+        setCurrentSongHasLocalAiTheme(false);
 
         if (options?.allowLastUsedFallback) {
             const lastDualTheme = await getLastDualTheme();
@@ -553,6 +577,8 @@ export function useThemeController({
             const normalizedDualTheme = applyStoredAnimationIntensityToDualTheme(sanitizeDualTheme(dualTheme));
             if (currentSong) {
                 await saveToCache(`dual_theme_${currentSong.id}`, normalizedDualTheme);
+                saveSyncedThemeWithoutBlocking(currentSong, normalizedDualTheme, source === 'auto' ? 'auto' : 'manual');
+                setCurrentSongHasLocalAiTheme(true);
             }
 
             const shouldApply = options.shouldApply?.() ?? true;
@@ -566,7 +592,7 @@ export function useThemeController({
             setStatusMsg({
                 type: 'success',
                 text: bgMode === 'custom' && customTheme
-                    ? 'AI 主题已更新，自定义主题仍为首选'
+                    ? t('notifications.aiThemeUpdatedCustomPreferred')
                     : t('status.themeApplied', { themeName: selectedTheme.name }),
             });
 
@@ -580,6 +606,7 @@ export function useThemeController({
 
                 if (currentSong) {
                     await saveToCache(`dual_theme_${currentSong.id}`, fallbackTheme);
+                    saveSyncedThemeWithoutBlocking(currentSong, fallbackTheme, 'fallback');
                 }
 
                 if (!shouldApply) {
@@ -590,7 +617,7 @@ export function useThemeController({
                 setStatusMsg({
                     type: 'info',
                     text: bgMode === 'custom' && customTheme
-                        ? 'AI 主题已生成，但当前仍优先使用自定义主题'
+                        ? t('notifications.aiThemeGeneratedCustomPreferred')
                         : t('status.aiFallbackThemeUsed'),
                 });
                 return { status: 'generated', applied: true };

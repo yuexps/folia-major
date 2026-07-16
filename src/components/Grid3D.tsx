@@ -314,7 +314,11 @@ export const Grid3D: React.FC<Grid3DProps> = (props) => {
     const fetchRadioItems = async () => {
         setLoadingRadio(true);
         try {
-            const fmRes = await neteaseApi.getPersonalFm();
+            const [fmRes, dailyRes, personalizedRes] = await Promise.all([
+                neteaseApi.getPersonalFm(),
+                neteaseApi.getDailyRecommendedSongs(),
+                neteaseApi.getPersonalizedPlaylists(35),
+            ]);
             let fmCoverUrl = '';
             if (fmRes.data && fmRes.data.length > 0) {
                 fmCoverUrl = fmRes.data[0].album?.picUrl || fmRes.data[0].al?.picUrl || '';
@@ -328,7 +332,17 @@ export const Grid3D: React.FC<Grid3DProps> = (props) => {
                 isFm: true,
             };
 
-            const personalizedRes = await neteaseApi.getPersonalizedPlaylists(35);
+            const dailySongs = dailyRes.songs || [];
+            const dailyItem = {
+                id: 'daily_recommendations',
+                name: t('home.dailyRecommendations'),
+                coverUrl: dailySongs[0]?.al?.picUrl || dailySongs[0]?.album?.picUrl || '',
+                trackCount: dailySongs.length,
+                description: t('home.dailyRecommendationsDescription'),
+                summary: t('home.dailyRecommendationsSummary'),
+                isDailyRecommendations: true,
+            };
+
             let personalizedItems: any[] = [];
             if (personalizedRes.result) {
                 personalizedItems = personalizedRes.result.map((r: any) => ({
@@ -336,11 +350,11 @@ export const Grid3D: React.FC<Grid3DProps> = (props) => {
                     name: r.name,
                     coverUrl: r.picUrl,
                     trackCount: r.trackCount,
-                    description: r.copywriter || '推荐歌单',
+                    description: r.copywriter || t('home.playlists'),
                     summary: r.copywriter || ''
                 }));
             }
-            setRadioItems([fmItem, ...personalizedItems]);
+            setRadioItems([fmItem, dailyItem, ...personalizedItems]);
         } catch (e) {
             console.error('[Grid3D] Failed to fetch radio items', e);
         } finally {
@@ -360,7 +374,7 @@ export const Grid3D: React.FC<Grid3DProps> = (props) => {
             name: p.name,
             coverUrl: p.coverImgUrl || (p as any).coverUrl,
             trackCount: p.trackCount,
-            description: p.creator?.nickname || '歌单',
+            description: p.creator?.nickname || t('home.playlists'),
             summary: p.description || '',
             type: 'playlist' as const,
             raw: p
@@ -373,7 +387,7 @@ export const Grid3D: React.FC<Grid3DProps> = (props) => {
             name: a.name,
             coverUrl: a.picUrl,
             trackCount: a.size,
-            description: a.artists?.[0]?.name || '未知歌手',
+            description: a.artists?.[0]?.name || t('player.unknownArtist'),
             summary: a.description || a.briefDesc || '',
             type: 'album' as const,
             raw: a
@@ -386,9 +400,13 @@ export const Grid3D: React.FC<Grid3DProps> = (props) => {
             name: r.name,
             coverUrl: r.coverUrl,
             trackCount: r.trackCount,
-            description: r.description || '电台',
+            description: r.description || t('home.radio'),
             summary: r.summary || '',
-            type: r.isFm ? 'radio' as const : 'playlist' as const,
+            type: r.isFm
+                ? 'radio' as const
+                : r.isDailyRecommendations
+                    ? 'daily_recommendations' as const
+                    : 'playlist' as const,
             raw: r
         }));
     }, [radioItems]);
@@ -493,7 +511,7 @@ export const Grid3D: React.FC<Grid3DProps> = (props) => {
                             <Settings size={20} style={{ color: 'var(--text-primary)' }} />
                             {showUpdateIndicator && (
                                 <span className="text-[10px] font-medium text-zinc-800 dark:text-zinc-200 opacity-80 whitespace-nowrap bg-zinc-200/50 dark:bg-white/10 px-2 py-0.5 rounded-md">
-                                    新版本发布
+                                    {t('options.updateAvailable')}
                                 </span>
                             )}
                         </button>
@@ -510,7 +528,7 @@ export const Grid3D: React.FC<Grid3DProps> = (props) => {
                                         background: `conic-gradient(from -90deg, ${isDaylight ? (theme?.accentColor || 'rgba(17,24,39,0.92)') : 'rgba(255,255,255,0.98)'} 0deg ${scanProgressPercent * 3.6}deg, ${isDaylight ? 'rgba(24,24,27,0.16)' : 'rgba(255,255,255,0.14)'} ${scanProgressPercent * 3.6}deg 360deg)`,
                                         borderRadius: '999px'
                                     }}
-                                    title="查看扫描进度"
+                                    title={t('options.scanProgress')}
                                 >
                                     <div
                                         className={`relative flex items-center justify-center min-w-[56px] h-7 px-2.5 rounded-full backdrop-blur-md ${
@@ -533,10 +551,10 @@ export const Grid3D: React.FC<Grid3DProps> = (props) => {
                                             }`}
                                         >
                                             <div className="text-sm font-semibold truncate">
-                                                正在扫描 {scanProgress.folderName}
+                                                {t('options.scanningFolder', { folderName: scanProgress.folderName })}
                                             </div>
                                             <div className={`text-xs mt-1 ${isDaylight ? 'text-zinc-600' : 'text-zinc-300/70'}`}>
-                                                正在后台提取元数据与封面，媒体库较大时会持续一段时间。
+                                                {t('options.scanProgressDesc')}
                                             </div>
                                             <div className="mt-3 flex items-center justify-between text-xs font-mono">
                                                 <span>进度</span>
@@ -564,8 +582,8 @@ export const Grid3D: React.FC<Grid3DProps> = (props) => {
                             <div className="inline-flex items-center gap-0">
                                 {[
                                     { key: 'playlist', label: t('home.playlists') },
-                                    { key: 'radio', label: t('home.radio') || '电台' },
-                                    { key: 'albums', label: t('home.albums') || '专辑' },
+                                    { key: 'radio', label: t('home.radio') },
+                                    { key: 'albums', label: t('home.albums') },
                                     { key: 'local', label: t('localMusic.folder') },
                                     ...(navidromeEnabled ? [{ key: 'navidrome', label: t('navidrome.title') || 'Navidrome' }] : []),
                                 ].map((tab) => {
@@ -593,7 +611,7 @@ export const Grid3D: React.FC<Grid3DProps> = (props) => {
                                         data-stage-active={stageIsActive ? 'true' : 'false'}
                                         className={`relative inline-flex items-center justify-center px-4 py-1.5 rounded-full text-xs md:text-sm font-medium transition-colors duration-300 whitespace-nowrap ${navPillInactiveText}`}
                                     >
-                                        <span className="relative z-10">{t('home.stage') || '舞台'}</span>
+                                        <span className="relative z-10">{t('home.stage')}</span>
                                     </button>
                                 )}
                             </div>
@@ -650,7 +668,7 @@ export const Grid3D: React.FC<Grid3DProps> = (props) => {
                                     ? t('home.albums')
                                     : t('home.radio')
                         }
-                        mapButtonLabel={t('home.allAlbums') || '全部'}
+                        mapButtonLabel={t('home.allAlbums')}
                         items={currentDesktopItems}
                         focusedIndex={focusedIndex}
                         onFocusedIndexChange={setFocusedIndex}
@@ -704,41 +722,55 @@ export const Grid3D: React.FC<Grid3DProps> = (props) => {
             </div>
 
             {/* Login Modal */}
-            {showLoginModal && (
-                <div className="absolute inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-xl p-4">
-                    <div className="bg-zinc-900/90 border border-white/10 p-8 rounded-3xl max-w-sm w-full text-center relative shadow-2xl animate-in fade-in zoom-in-95 duration-200">
-                        <button
-                            onClick={() => {
-                                setShowLoginModal(false);
-                                if (qrCheckInterval.current) clearInterval(qrCheckInterval.current);
-                            }}
-                            className="absolute top-4 right-4 opacity-30 hover:opacity-100 rounded-full bg-white/5 p-1 transition-colors cursor-pointer"
-                            style={{ color: 'var(--text-primary)' }}
+            <AnimatePresence>
+                {showLoginModal && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.25 }}
+                        className="absolute inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-xl p-4"
+                    >
+                        <motion.div
+                            initial={{ scale: 0.92, opacity: 0, y: 24 }}
+                            animate={{ scale: 1, opacity: 1, y: 0 }}
+                            exit={{ scale: 0.92, opacity: 0, y: 12 }}
+                            transition={{ type: 'spring', bounce: 0, duration: 0.5 }}
+                            className="bg-zinc-900/90 border border-white/10 p-8 rounded-3xl max-w-sm w-full text-center relative shadow-2xl"
                         >
-                            ✕
-                        </button>
-                        <h3 className="text-lg font-bold mb-6" style={{ color: 'var(--text-primary)' }}>{t('home.loginTitle')}</h3>
+                            <button
+                                onClick={() => {
+                                    setShowLoginModal(false);
+                                    if (qrCheckInterval.current) clearInterval(qrCheckInterval.current);
+                                }}
+                                className="absolute top-4 right-4 opacity-30 hover:opacity-100 rounded-full bg-white/5 p-1 transition-colors cursor-pointer"
+                                style={{ color: 'var(--text-primary)' }}
+                            >
+                                ✕
+                            </button>
+                            <h3 className="text-lg font-bold mb-6" style={{ color: 'var(--text-primary)' }}>{t('home.loginTitle')}</h3>
 
-                        <div className="relative inline-block bg-white p-2 rounded-xl mb-4 shadow-inner">
-                            {qrCodeImg ? (
-                                <img src={qrCodeImg} alt="QR Code" className="w-40 h-40" />
-                            ) : (
-                                <div className="w-40 h-40 flex items-center justify-center bg-gray-100 rounded-lg">
-                                    <Loader2 className="animate-spin text-gray-400" size={24} />
-                                </div>
-                            )}
-                        </div>
+                            <div className="relative inline-block bg-white p-2 rounded-xl mb-4 shadow-inner">
+                                {qrCodeImg ? (
+                                    <img src={qrCodeImg} alt="QR Code" className="w-40 h-40" />
+                                ) : (
+                                    <div className="w-40 h-40 flex items-center justify-center bg-gray-100 rounded-lg">
+                                        <Loader2 className="animate-spin text-gray-400" size={24} />
+                                    </div>
+                                )}
+                            </div>
 
-                        <p className={`text-xs font-medium mt-2 ${qrStatus.includes('Success') ? 'text-green-400' : 'opacity-60'}`} style={{ color: qrStatus.includes('Success') ? undefined : 'var(--text-secondary)' }}>
-                            {qrStatus}
-                        </p>
+                            <p className={`text-xs font-medium mt-2 ${qrStatus.includes('Success') ? 'text-green-400' : 'opacity-60'}`} style={{ color: qrStatus.includes('Success') ? undefined : 'var(--text-secondary)' }}>
+                                {qrStatus}
+                            </p>
 
-                        <p className="text-[10px] opacity-30 mt-6" style={{ color: 'var(--text-secondary)' }}>
-                            {t('home.loginNote')}
-                        </p>
-                    </div>
-                </div>
-            )}
+                            <p className="text-[10px] opacity-30 mt-6" style={{ color: 'var(--text-secondary)' }}>
+                                {t('home.loginNote')}
+                            </p>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {/* User Avatar - Back to Player */}
             {user && (

@@ -212,6 +212,71 @@
       "contributions": [
         "ideas"
       ]
+    },
+    {
+      "login": "Jirankun",
+      "name": "Zhyllan Fyllah",
+      "avatar_url": "https://avatars.githubusercontent.com/u/174584819?v=4",
+      "profile": "https://github.com/Jirankun",
+      "contributions": [
+        "code"
+      ]
+    },
+    {
+      "login": "ROYI-Jiang",
+      "name": "ROYI-Jiang",
+      "avatar_url": "https://avatars.githubusercontent.com/u/124415415?v=4",
+      "profile": "https://github.com/ROYI-Jiang",
+      "contributions": [
+        "ideas",
+        "bug"
+      ]
+    },
+    {
+      "login": "lhtstudy",
+      "name": "LHT",
+      "avatar_url": "https://avatars.githubusercontent.com/u/91039875?v=4",
+      "profile": "https://github.com/lhtstudy",
+      "contributions": [
+        "bug"
+      ]
+    },
+    {
+      "login": "SXP-Simon",
+      "name": "Helian Nuits",
+      "avatar_url": "https://avatars.githubusercontent.com/u/177809507?v=4",
+      "profile": "https://github.com/SXP-Simon",
+      "contributions": [
+        "code"
+      ]
+    },
+    {
+      "login": "LXiTong",
+      "name": "Kuroneko",
+      "avatar_url": "https://avatars.githubusercontent.com/u/77535614?v=4",
+      "profile": "https://github.com/LXiTong",
+      "contributions": [
+        "ideas"
+      ]
+    },
+    {
+      "login": "AZURE-HUAI",
+      "name": "浮梦怀生",
+      "avatar_url": "https://avatars.githubusercontent.com/u/247430394?v=4",
+      "profile": "https://github.com/AZURE-HUAI",
+      "contributions": [
+        "code"
+      ]
+    },
+    {
+      "login": "LucasLeungKoi",
+      "name": "Lucas",
+      "avatar_url": "https://avatars.githubusercontent.com/u/104263817?v=4",
+      "profile": "https://github.com/LucasLeungKoi",
+      "contributions": [
+        "code",
+        "bug"
+      ]
     }
   ],
   "commit": false,

@@ -8,11 +8,14 @@ const createContext = (overrides: Partial<CommandPaletteContext> = {}): CommandP
     localSongs: [],
     playerState: PlayerState.PAUSED,
     t: (_key, fallback) => fallback ?? '',
+    setStatusMsg: vi.fn(),
     openSettings: vi.fn(),
     navigateToHome: vi.fn(),
     navigateToPlayer: vi.fn(),
     navigateToSearch: vi.fn(),
     toggleBrowserFullscreen: vi.fn(async () => true),
+    toggleRemoteControlWindow: vi.fn(async () => true),
+    toggleMainWindowAlwaysOnTop: vi.fn(async () => true),
     setHomeViewTab: vi.fn(),
     setPanelTab: vi.fn(),
     setIsPanelOpen: vi.fn(),
@@ -26,6 +29,8 @@ const createContext = (overrides: Partial<CommandPaletteContext> = {}): CommandP
     isGeneratingTheme: false,
     generateAITheme: vi.fn(),
     setVisualizerMode: vi.fn(),
+    randomVisualizerModePerSong: false,
+    toggleRandomVisualizerModePerSong: vi.fn(),
     setVisualizerBackgroundMode: vi.fn(),
     setMonetBackgroundTuning: vi.fn(),
     toggleTransparentBackground: vi.fn(),
@@ -75,6 +80,23 @@ describe('command palette registry', () => {
         match.command.execute(match.input, context);
 
         expect(context.openSettings).toHaveBeenCalledWith('options', 'integration');
+    });
+
+    it('matches sync server settings and manual sync commands', () => {
+        expect(getCommandPaletteMatches('sync server')[0].command.id).toBe('settings-r2-sync');
+        expect(getCommandPaletteMatches('立即同步')[0].command.id).toBe('sync-now');
+    });
+
+    it('shows a toast instead of syncing when sync is not configured', async () => {
+        const context = createContext();
+        const [match] = getCommandPaletteMatches('立即同步');
+
+        await match.command.execute(match.input, context);
+
+        expect(context.setStatusMsg).toHaveBeenCalledWith({
+            type: 'info',
+            text: 'Sync is not enabled. Configure and enable it in Storage settings first.',
+        });
     });
 
     it('opens general settings and executes direct language switch commands', async () => {
@@ -350,5 +372,42 @@ describe('command palette registry', () => {
         expect(matchCommon.command.id).toBe('background-common');
         matchCommon.command.execute('', context);
         expect(context.setVisualizerBackgroundMode).toHaveBeenCalledWith('common');
+    });
+
+    it('matches and executes the Diorama visualizer command', () => {
+        const context = createContext();
+        const [match] = getCommandPaletteMatches('镜台');
+
+        expect(match.command.id).toBe('visualizer-diorama');
+        match.command.execute('', context);
+        expect(context.setVisualizerMode).toHaveBeenCalledWith('diorama');
+    });
+
+    it('matches and executes desktop window toggle commands', async () => {
+        vi.stubGlobal('window', { electron: {} });
+
+        try {
+            const context = createContext();
+            const [remoteMatch] = getCommandPaletteMatches('切换遥控窗口', context);
+            expect(remoteMatch.command.id).toBe('desktop-toggle-remote-control');
+            await remoteMatch.command.execute('', context);
+            expect(context.toggleRemoteControlWindow).toHaveBeenCalled();
+
+            const [topMatch] = getCommandPaletteMatches('主窗口置顶', context);
+            expect(topMatch.command.id).toBe('desktop-toggle-main-window-always-on-top');
+            await topMatch.command.execute('', context);
+            expect(context.toggleMainWindowAlwaysOnTop).toHaveBeenCalled();
+        } finally {
+            vi.unstubAllGlobals();
+        }
+    });
+
+    it('toggles random visualizer mode for each song', () => {
+        const context = createContext();
+        const [match] = getCommandPaletteMatches('每首歌随机动画');
+
+        expect(match.command.id).toBe('visualizer-toggle-random-per-song');
+        match.command.execute('', context);
+        expect(context.toggleRandomVisualizerModePerSong).toHaveBeenCalled();
     });
 });

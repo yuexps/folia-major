@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Monitor, Palette, Settings2, LayoutGrid, Download, Copy, Check } from 'lucide-react';
+import { Monitor, Palette, Settings2, LayoutGrid, Download, Copy, Check, TriangleAlert } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
 import {
@@ -11,6 +11,7 @@ import {
     type ThemeMode,
     type UrlBackgroundItem,
 } from '../../../types';
+import { applyVisualizerTuningsToSettings, collectVisualizerTunings } from '../../visualizer/tuningRegistry';
 import { useSettingsUiStore } from '../../../stores/useSettingsUiStore';
 import { sanitizeUrlBackgroundItem } from '../../../utils/urlBackground';
 
@@ -179,6 +180,31 @@ const decompressTilt = (o: any): any => ({
     colorScheme: o.tcs || 'default',
 });
 
+const compressDiorama = (t: any): any => ({
+    cs: t.cameraSpeed,
+    ma: t.motionAmount,
+    ar: t.audioReactivity,
+    spa: t.showParticles,
+    ge: t.glowEnabled,
+    gi: t.glowIntensity,
+    se: t.soulEnabled,
+    si: t.soulIntensity,
+    gre: t.gradientEnabled,
+    gri: t.gradientIntensity,
+});
+const decompressDiorama = (o: any): any => ({
+    cameraSpeed: o.cs !== undefined ? o.cs : 1,
+    motionAmount: o.ma !== undefined ? o.ma : 1,
+    audioReactivity: o.ar !== undefined ? o.ar : 1,
+    showParticles: o.spa !== undefined ? o.spa : true,
+    glowEnabled: o.ge !== undefined ? o.ge : true,
+    glowIntensity: o.gi !== undefined ? o.gi : 1,
+    soulEnabled: o.se !== undefined ? o.se : true,
+    soulIntensity: o.si !== undefined ? o.si : 1,
+    gradientEnabled: o.gre !== undefined ? o.gre : false,
+    gradientIntensity: o.gri !== undefined ? o.gri : 1,
+});
+
 const compressMonetBackground = (t: any): any => ({
     mbs: t.backgroundSource,
     mbl: t.backgroundLayout,
@@ -234,6 +260,7 @@ export const compressConfig = (config: any): string => {
         };
     }
     if (config.visualizerMode) minified.vm = config.visualizerMode;
+    if (config.randomVisualizerModePerSong !== undefined) minified.rvms = config.randomVisualizerModePerSong;
     if (config.visualizerBackgroundMode) minified.vbm = config.visualizerBackgroundMode;
     if (config.backgroundOpacity !== undefined) minified.bo = config.backgroundOpacity;
     if (config.visualizerOpacity !== undefined) minified.vo = config.visualizerOpacity;
@@ -247,6 +274,7 @@ export const compressConfig = (config: any): string => {
     if (config.subtitleFontFamily) minified.sff = config.subtitleFontFamily;
     if (config.subtitleFontFallbackFamilies?.length) minified.sfff = config.subtitleFontFallbackFamilies;
 
+    if (config.visualizerTunings) minified.vt = config.visualizerTunings;
     if (config.classicTuning) minified.ct = compressClassic(config.classicTuning);
     if (config.cadenzaTuning) minified.cat = compressCadenza(config.cadenzaTuning);
     if (config.partitaTuning) minified.pt = compressPartita(config.partitaTuning);
@@ -254,6 +282,7 @@ export const compressConfig = (config: any): string => {
     if (config.claddaghTuning) minified.clt = compressCladdagh(config.claddaghTuning);
     if (config.cappellaTuning) minified.cpt = compressCappella(config.cappellaTuning);
     if (config.tiltTuning) minified.tt = compressTilt(config.tiltTuning);
+    if (config.dioramaTuning) minified.dot = compressDiorama(config.dioramaTuning);
     if (config.monetBackgroundTuning) minified.mbt = compressMonetBackground(config.monetBackgroundTuning);
     if (config.monetTuning) minified.mt = compressMonet(config.monetTuning);
     if (config.urlBackgroundList) minified.ubl = config.urlBackgroundList;
@@ -288,7 +317,7 @@ export const decompressConfig = (str: string): any => {
         throw new Error('Invalid format');
     }
 
-    const isMinified = parsed.t !== undefined || parsed.vm !== undefined || parsed.ct !== undefined || parsed.cat !== undefined || parsed.hpts !== undefined || parsed.sst !== undefined || parsed.lff !== undefined || parsed.sfi !== undefined;
+    const isMinified = parsed.t !== undefined || parsed.vm !== undefined || parsed.rvms !== undefined || parsed.ct !== undefined || parsed.cat !== undefined || parsed.hpts !== undefined || parsed.sst !== undefined || parsed.lff !== undefined || parsed.sfi !== undefined;
     if (isMinified) {
         const decompressed: any = {};
         if (parsed.t) {
@@ -298,6 +327,7 @@ export const decompressConfig = (str: string): any => {
             };
         }
         if (parsed.vm) decompressed.visualizerMode = parsed.vm;
+        if (parsed.rvms !== undefined) decompressed.randomVisualizerModePerSong = parsed.rvms;
         if (parsed.vbm) decompressed.visualizerBackgroundMode = parsed.vbm;
         if (parsed.bo !== undefined) decompressed.backgroundOpacity = parsed.bo;
         if (parsed.vo !== undefined) decompressed.visualizerOpacity = parsed.vo;
@@ -312,12 +342,14 @@ export const decompressConfig = (str: string): any => {
         if (parsed.sfff) decompressed.subtitleFontFallbackFamilies = parsed.sfff;
 
         if (parsed.ct) decompressed.classicTuning = decompressClassic(parsed.ct);
+        if (parsed.vt) decompressed.visualizerTunings = parsed.vt;
         if (parsed.cat) decompressed.cadenzaTuning = decompressCadenza(parsed.cat);
         if (parsed.pt) decompressed.partitaTuning = decompressPartita(parsed.pt);
         if (parsed.ft) decompressed.fumeTuning = decompressFume(parsed.ft);
         if (parsed.clt) decompressed.claddaghTuning = decompressCladdagh(parsed.clt);
         if (parsed.cpt) decompressed.cappellaTuning = decompressCappella(parsed.cpt);
         if (parsed.tt) decompressed.tiltTuning = decompressTilt(parsed.tt);
+        if (parsed.dot) decompressed.dioramaTuning = decompressDiorama(parsed.dot);
         if (parsed.mbt) decompressed.monetBackgroundTuning = decompressMonetBackground(parsed.mbt);
         if (parsed.mt) decompressed.monetTuning = decompressMonet(parsed.mt);
         if (parsed.ubl) decompressed.urlBackgroundList = parsed.ubl;
@@ -328,13 +360,13 @@ export const decompressConfig = (str: string): any => {
         return decompressed;
     } else {
         const validKeys = [
-            'theme', 'visualizerMode', 'visualizerBackgroundMode', 'backgroundOpacity',
+            'theme', 'visualizerMode', 'randomVisualizerModePerSong', 'visualizerBackgroundMode', 'backgroundOpacity',
             'visualizerOpacity', 'hidePlayerTranslationSubtitle', 'showSubtitleTranslation',
             'lyricsFontStyle', 'lyricsFontScale', 'lyricsFontFallbackFamilies',
             'subtitleFontInheritsLyrics', 'subtitleFontStyle', 'subtitleFontFamily',
-            'subtitleFontFallbackFamilies', 'classicTuning',
+            'subtitleFontFallbackFamilies', 'visualizerTunings', 'classicTuning',
             'cadenzaTuning', 'partitaTuning', 'fumeTuning', 'claddaghTuning', 'cappellaTuning',
-            'tiltTuning', 'monetBackgroundTuning', 'monetTuning',
+            'tiltTuning', 'dioramaTuning', 'monetBackgroundTuning', 'monetTuning',
             'urlBackgroundList', 'urlBackgroundSelectedId',
             'songThemeAutoSwitchEnabled', 'songThemeAutoGenerateEnabled',
         ];
@@ -417,6 +449,7 @@ const AppearanceSettingsSubview: React.FC<AppearanceSettingsSubviewProps> = ({
     const store = useSettingsUiStore(useShallow(state => ({
         statusSetter: state.statusSetter,
         visualizerMode: state.visualizerMode,
+        randomVisualizerModePerSong: state.randomVisualizerModePerSong,
         visualizerBackgroundMode: state.visualizerBackgroundMode,
         backgroundOpacity: state.backgroundOpacity,
         visualizerOpacity: state.visualizerOpacity,
@@ -436,12 +469,14 @@ const AppearanceSettingsSubview: React.FC<AppearanceSettingsSubviewProps> = ({
         claddaghTuning: state.claddaghTuning,
         cappellaTuning: state.cappellaTuning,
         tiltTuning: state.tiltTuning,
+        dioramaTuning: state.dioramaTuning,
         monetBackgroundTuning: state.monetBackgroundTuning,
         monetTuning: state.monetTuning,
         urlBackgroundList: state.urlBackgroundList,
         urlBackgroundSelectedId: state.urlBackgroundSelectedId,
 
         handleSetVisualizerMode: state.handleSetVisualizerMode,
+        handleToggleRandomVisualizerModePerSong: state.handleToggleRandomVisualizerModePerSong,
         handleSetVisualizerBackgroundMode: state.handleSetVisualizerBackgroundMode,
         handleSetBackgroundOpacity: state.handleSetBackgroundOpacity,
         handleSetVisualizerOpacity: state.handleSetVisualizerOpacity,
@@ -461,6 +496,7 @@ const AppearanceSettingsSubview: React.FC<AppearanceSettingsSubviewProps> = ({
         handleSetCladdaghTuning: state.handleSetCladdaghTuning,
         handleSetCappellaTuning: state.handleSetCappellaTuning,
         handleSetTiltTuning: state.handleSetTiltTuning,
+        handleSetDioramaTuning: state.handleSetDioramaTuning,
         handleSetMonetBackgroundTuning: state.handleSetMonetBackgroundTuning,
         handleSetMonetTuning: state.handleSetMonetTuning,
         handleAddUrlBackgroundItem: state.handleAddUrlBackgroundItem,
@@ -492,6 +528,7 @@ const AppearanceSettingsSubview: React.FC<AppearanceSettingsSubviewProps> = ({
         return {
             theme: exportTheme,
             visualizerMode: store.visualizerMode,
+            randomVisualizerModePerSong: store.randomVisualizerModePerSong,
             visualizerBackgroundMode: store.visualizerBackgroundMode,
             backgroundOpacity: store.backgroundOpacity,
             visualizerOpacity: store.visualizerOpacity,
@@ -504,6 +541,7 @@ const AppearanceSettingsSubview: React.FC<AppearanceSettingsSubviewProps> = ({
             subtitleFontStyle: store.subtitleFontStyle,
             subtitleFontFamily: store.subtitleFontFamily,
             subtitleFontFallbackFamilies: store.subtitleFontFallbackFamilies,
+            visualizerTunings: collectVisualizerTunings(store as unknown as Record<string, unknown>),
             classicTuning: store.classicTuning,
             cadenzaTuning: store.cadenzaTuning,
             partitaTuning: store.partitaTuning,
@@ -511,6 +549,7 @@ const AppearanceSettingsSubview: React.FC<AppearanceSettingsSubviewProps> = ({
             claddaghTuning: store.claddaghTuning,
             cappellaTuning: store.cappellaTuning,
             tiltTuning: store.tiltTuning,
+            dioramaTuning: store.dioramaTuning,
             monetBackgroundTuning: store.monetBackgroundTuning,
             monetTuning: store.monetTuning,
             urlBackgroundList: store.urlBackgroundList,
@@ -527,7 +566,7 @@ const AppearanceSettingsSubview: React.FC<AppearanceSettingsSubviewProps> = ({
             await navigator.clipboard.writeText(code);
             setCopiedType('shortcode');
             setTimeout(() => setCopiedType('none'), 2000);
-            store.statusSetter?.({ type: 'success', text: t('status.copied') || '已复制' });
+            store.statusSetter?.({ type: 'success', text: t('status.copied') });
         } catch (err) {
             console.error('Failed to copy shortcode:', err);
         }
@@ -540,7 +579,7 @@ const AppearanceSettingsSubview: React.FC<AppearanceSettingsSubviewProps> = ({
             await navigator.clipboard.writeText(code);
             setCopiedType('json');
             setTimeout(() => setCopiedType('none'), 2000);
-            store.statusSetter?.({ type: 'success', text: t('status.copied') || '已复制' });
+            store.statusSetter?.({ type: 'success', text: t('status.copied') });
         } catch (err) {
             console.error('Failed to copy JSON:', err);
         }
@@ -560,6 +599,9 @@ const AppearanceSettingsSubview: React.FC<AppearanceSettingsSubviewProps> = ({
             // 2. Restore Visualizer Setup
             if (config.visualizerMode) {
                 store.handleSetVisualizerMode(config.visualizerMode);
+            }
+            if (config.randomVisualizerModePerSong !== undefined) {
+                store.handleToggleRandomVisualizerModePerSong(Boolean(config.randomVisualizerModePerSong));
             }
             if (config.visualizerBackgroundMode) {
                 store.handleSetVisualizerBackgroundMode(config.visualizerBackgroundMode);
@@ -599,31 +641,37 @@ const AppearanceSettingsSubview: React.FC<AppearanceSettingsSubviewProps> = ({
             }
 
             // Tunings
-            if (config.classicTuning) {
+            if (config.visualizerTunings) {
+                applyVisualizerTuningsToSettings(store as unknown as Record<string, unknown>, config.visualizerTunings);
+            }
+            if (!config.visualizerTunings && config.classicTuning) {
                 store.handleSetClassicTuning(config.classicTuning);
             }
-            if (config.cadenzaTuning) {
+            if (!config.visualizerTunings && config.cadenzaTuning) {
                 store.handleSetCadenzaTuning(config.cadenzaTuning);
             }
-            if (config.partitaTuning) {
+            if (!config.visualizerTunings && config.partitaTuning) {
                 store.handleSetPartitaTuning(config.partitaTuning);
             }
-            if (config.fumeTuning) {
+            if (!config.visualizerTunings && config.fumeTuning) {
                 store.handleSetFumeTuning(config.fumeTuning);
             }
-            if (config.claddaghTuning) {
+            if (!config.visualizerTunings && config.claddaghTuning) {
                 store.handleSetCladdaghTuning(config.claddaghTuning);
             }
-            if (config.cappellaTuning) {
+            if (!config.visualizerTunings && config.cappellaTuning) {
                 store.handleSetCappellaTuning(config.cappellaTuning);
             }
-            if (config.tiltTuning) {
+            if (!config.visualizerTunings && config.tiltTuning) {
                 store.handleSetTiltTuning(config.tiltTuning);
+            }
+            if (!config.visualizerTunings && config.dioramaTuning) {
+                store.handleSetDioramaTuning(config.dioramaTuning);
             }
             if (config.monetBackgroundTuning) {
                 store.handleSetMonetBackgroundTuning(config.monetBackgroundTuning);
             }
-            if (config.monetTuning) {
+            if (!config.visualizerTunings && config.monetTuning) {
                 store.handleSetMonetTuning(config.monetTuning);
             }
             let mergedUrlList: UrlBackgroundItem[] | undefined;
@@ -663,11 +711,11 @@ const AppearanceSettingsSubview: React.FC<AppearanceSettingsSubviewProps> = ({
                 onToggleSongThemeAutoGenerate(Boolean(config.songThemeAutoGenerateEnabled));
             }
 
-            store.statusSetter?.({ type: 'success', text: t('options.importSuccess') || '配置导入成功！' });
+            store.statusSetter?.({ type: 'success', text: t('options.importSuccess') });
             setImportText('');
         } catch (err) {
             console.error('Import settings failed:', err);
-            store.statusSetter?.({ type: 'error', text: t('options.importFailed') || '配置导入失败，请检查格式是否正确。' });
+            store.statusSetter?.({ type: 'error', text: t('options.importFailed') });
         }
     };
 
@@ -676,20 +724,20 @@ const AppearanceSettingsSubview: React.FC<AppearanceSettingsSubviewProps> = ({
             {/* Section 1: Theme presets and edit options */}
             <section>
                 <h3 className="text-sm font-bold uppercase tracking-wider opacity-50 mb-3 flex items-center gap-2" style={{ color: 'var(--text-secondary)' }}>
-                    <Palette size={14} /> {t('options.themePresets') || '主题与配色'}
+                    <Palette size={14} /> {t('options.themePresets')}
                 </h3>
                 <div className={`p-4 rounded-xl border space-y-4 ${settingsCardClass}`}>
                     <div className="flex items-center justify-between gap-3">
                         <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-                            {t('options.themePresets') || '主题配色预设'}
+                            {t('options.themePresets')}
                         </div>
                         <button
                             type="button"
                             onClick={onOpenThemePark}
                             className={`shrink-0 w-9 h-9 rounded-full border transition-colors flex items-center justify-center ${utilityGhostButtonClass}`}
                             style={{ color: 'var(--text-primary)' }}
-                            title={t('options.openThemePark') || '打开 Theme Park'}
-                            aria-label={t('options.openThemePark') || '打开 Theme Park'}
+                            title={t('options.openThemePark')}
+                            aria-label={t('options.openThemePark')}
                         >
                             <Palette size={16} />
                         </button>
@@ -726,10 +774,10 @@ const AppearanceSettingsSubview: React.FC<AppearanceSettingsSubviewProps> = ({
                     <div className={`p-3 rounded-xl border flex items-center justify-between gap-3 ${settingsCardClass}`}>
                         <div className="space-y-1">
                             <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-                                {t('options.preferCustomTheme') || '优先使用自定义主题'}
+                                {t('options.preferCustomTheme')}
                             </div>
                             <div className="text-xs opacity-50" style={{ color: 'var(--text-secondary)' }}>
-                                {t('options.preferCustomThemeDesc') || '开启后会关闭歌曲主题自动切换。'}
+                                {t('options.preferCustomThemeDesc')}
                             </div>
                         </div>
                         <button
@@ -744,10 +792,10 @@ const AppearanceSettingsSubview: React.FC<AppearanceSettingsSubviewProps> = ({
                     <div className={`p-3 rounded-xl border flex items-center justify-between gap-3 ${settingsCardClass}`}>
                         <div className="space-y-1">
                             <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-                                {t('options.autoSwitchSongTheme') || '主题自动切换'}
+                                {t('options.autoSwitchSongTheme')}
                             </div>
                             <div className="text-xs opacity-50" style={{ color: 'var(--text-secondary)' }}>
-                                {t('options.autoSwitchSongThemeDesc') || '当切换到的歌曲曾经生成过 AI 主题的时候，自动应用 AI 主题。'}
+                                {t('options.autoSwitchSongThemeDesc')}
                             </div>
                         </div>
                         <button
@@ -762,10 +810,10 @@ const AppearanceSettingsSubview: React.FC<AppearanceSettingsSubviewProps> = ({
                         <div className={`p-3 rounded-xl border flex items-center justify-between gap-3 ${settingsCardClass}`}>
                             <div className="space-y-1">
                                 <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-                                    {t('options.autoGenerateSongTheme') || '自动为播放歌曲进行主题生成'}
+                                    {t('options.autoGenerateSongTheme')}
                                 </div>
                                 <div className="text-xs opacity-50" style={{ color: 'var(--text-secondary)' }}>
-                                    {t('options.autoGenerateSongThemeDesc') || '当播放歌曲没有缓存 AI 主题时，自动调用AI并应用（会产生较高token费用！）'}
+                                    {t('options.autoGenerateSongThemeDesc')}
                                 </div>
                             </div>
                             <button
@@ -783,15 +831,15 @@ const AppearanceSettingsSubview: React.FC<AppearanceSettingsSubviewProps> = ({
             {/* Section 2: Lyrics Animation & Player View */}
             <section>
                 <h3 className="text-sm font-bold uppercase tracking-wider opacity-50 mb-3 flex items-center gap-2" style={{ color: 'var(--text-secondary)' }}>
-                    <Monitor size={14} /> {t('options.lyricsRenderer') || '歌词与播放页'}
+                    <Monitor size={14} /> {t('options.lyricsRenderer')}
                 </h3>
                 <div className={`p-4 rounded-xl border space-y-4 ${settingsCardClass}`}>
                     <div className="space-y-1">
                         <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-                            {t('options.lyricsRenderer') || '歌词动画'}
+                            {t('options.lyricsRenderer')}
                         </div>
                         <div className="text-xs opacity-50" style={{ color: 'var(--text-secondary)' }}>
-                            {t('options.lyricsRendererDesc') || '选择播放页使用的歌词渲染模式。'}
+                            {t('options.lyricsRendererDesc')}
                         </div>
                     </div>
                     <button
@@ -801,15 +849,15 @@ const AppearanceSettingsSubview: React.FC<AppearanceSettingsSubviewProps> = ({
                         style={{ color: 'var(--text-primary)' }}
                     >
                         <Settings2 size={16} />
-                        <span>{t('options.lyricsAnimationAdjust') || '歌词动画样式'}</span>
+                        <span>{t('options.lyricsAnimationAdjust')}</span>
                     </button>
                     <div className="pt-2 border-t border-white/5 flex items-center justify-between gap-4">
                         <div className="space-y-1">
                             <div className="text-sm font-medium flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
-                                {t('options.transparentPlayerBackground') || '播放页透明背景'}
+                                {t('options.transparentPlayerBackground')}
                             </div>
                             <div className="text-xs opacity-50 max-w-[360px]" style={{ color: 'var(--text-secondary)' }}>
-                                {t('options.transparentPlayerBackgroundDesc') || '仅对播放页生效。开启后会切换到透明窗口模式，适合 OBS 抠像。'}
+                                {t('options.transparentPlayerBackgroundDesc')}
                             </div>
                         </div>
                         <button
@@ -823,10 +871,10 @@ const AppearanceSettingsSubview: React.FC<AppearanceSettingsSubviewProps> = ({
                     <div className="pt-2 border-t border-white/5 flex items-center justify-between gap-4">
                         <div className="space-y-1">
                             <div className="text-sm font-medium flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
-                                {t('options.autoHidePlayerChrome') || '自动隐藏控制栏'}
+                                {t('options.autoHidePlayerChrome')}
                             </div>
                             <div className="text-xs opacity-50 max-w-[360px]" style={{ color: 'var(--text-secondary)' }}>
-                                {t('options.autoHidePlayerChromeDesc') || '开启后，自动隐藏播放页的进度条和右侧按钮。'}
+                                {t('options.autoHidePlayerChromeDesc')}
                             </div>
                         </div>
                         <button
@@ -843,16 +891,24 @@ const AppearanceSettingsSubview: React.FC<AppearanceSettingsSubviewProps> = ({
             {/* Section 3: Home Layout styles */}
             <section>
                 <h3 className="text-sm font-bold uppercase tracking-wider opacity-50 mb-3 flex items-center gap-2" style={{ color: 'var(--text-secondary)' }}>
-                    <LayoutGrid size={14} /> {t('options.homeLayoutStyle') || '主页布局与风格'}
+                    <LayoutGrid size={14} /> {t('options.homeLayoutStyle')}
                 </h3>
                 <div className={`p-4 rounded-xl border space-y-4 ${settingsCardClass}`}>
                     <div className="space-y-1">
                         <div className="text-sm font-medium flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
-                            {t('options.homeLayoutStyle') || '首页布局样式'}
+                            {t('options.homeLayoutStyle')}
                         </div>
                         <div className="text-xs opacity-50 max-w-[360px]" style={{ color: 'var(--text-secondary)' }}>
-                            {t('options.homeLayoutStyleDesc') || '选择首页展示的样式风格：经典(旧版)或万象(新版)透明桌面（支持拍立得单曲网格）。'}
+                            {t('options.homeLayoutStyleDesc')}
                         </div>
+                    </div>
+                    <div className={`flex items-start gap-2.5 rounded-lg border px-3 py-2.5 text-xs leading-relaxed ${
+                        isDaylight
+                            ? 'border-amber-500/25 bg-amber-500/10 text-amber-800'
+                            : 'border-amber-400/20 bg-amber-400/10 text-amber-200'
+                    }`}>
+                        <TriangleAlert size={15} className="mt-0.5 shrink-0" />
+                        <span>{t('options.classicHomeLayoutRemovalNotice')}</span>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                         <button
@@ -861,7 +917,7 @@ const AppearanceSettingsSubview: React.FC<AppearanceSettingsSubviewProps> = ({
                             style={getAccentOptionStyle(homeLayoutStyle === 'carousel')}
                         >
                             <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
-                                {t('options.homeLayoutStyleCarousel') || '经典(旧版)'}
+                                {t('options.homeLayoutStyleCarousel')}
                             </span>
                         </button>
                         <button
@@ -870,7 +926,7 @@ const AppearanceSettingsSubview: React.FC<AppearanceSettingsSubviewProps> = ({
                             style={getAccentOptionStyle(homeLayoutStyle === 'grid')}
                         >
                             <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
-                                {t('options.homeLayoutStyleGrid') || '万象(新版)'}
+                                {t('options.homeLayoutStyleGrid')}
                             </span>
                         </button>
                     </div>
@@ -879,10 +935,10 @@ const AppearanceSettingsSubview: React.FC<AppearanceSettingsSubviewProps> = ({
                         <div className="pt-4 border-t border-white/5 space-y-3">
                             <div className="space-y-1">
                                 <div className="text-sm font-medium flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
-                                    {t('options.grid3dCardStyle') || '3D 网格卡片样式'}
+                                    {t('options.grid3dCardStyle')}
                                 </div>
                                 <div className="text-xs opacity-50 max-w-[360px]" style={{ color: 'var(--text-secondary)' }}>
-                                    {t('options.grid3dCardStyleDesc') || '选择 3D 网格中每张卡片的外观：纯图片封面或经典的拍立得文本卡片。'}
+                                    {t('options.grid3dCardStyleDesc')}
                                 </div>
                             </div>
                             <div className="grid grid-cols-2 gap-3 mt-1">
@@ -892,7 +948,7 @@ const AppearanceSettingsSubview: React.FC<AppearanceSettingsSubviewProps> = ({
                                     style={getAccentOptionStyle(grid3dCardStyle === 'image')}
                                 >
                                     <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
-                                        {t('options.grid3dCardStyleImage') || '纯图片封面'}
+                                        {t('options.grid3dCardStyleImage')}
                                     </span>
                                 </button>
                                 <button
@@ -901,7 +957,7 @@ const AppearanceSettingsSubview: React.FC<AppearanceSettingsSubviewProps> = ({
                                     style={getAccentOptionStyle(grid3dCardStyle === 'card')}
                                 >
                                     <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
-                                        {t('options.grid3dCardStyleCard') || '拍立得卡片'}
+                                        {t('options.grid3dCardStyleCard')}
                                     </span>
                                 </button>
                             </div>
@@ -913,21 +969,21 @@ const AppearanceSettingsSubview: React.FC<AppearanceSettingsSubviewProps> = ({
             {/* Section 4: Configurations Import/Export (New feature) */}
             <section>
                 <h3 className="text-sm font-bold uppercase tracking-wider opacity-50 mb-3 flex items-center gap-2" style={{ color: 'var(--text-secondary)' }}>
-                    <Settings2 size={14} /> {t('options.importExportTitle') || '备份与导入'}
+                    <Settings2 size={14} /> {t('options.importExportTitle')}
                 </h3>
                 <div className={`p-4 rounded-xl border space-y-4 ${settingsCardClass}`}>
                     <div className="space-y-1">
                         <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-                            {t('options.importExportTitle') || '备份与导入配置'}
+                            {t('options.importExportTitle')}
                         </div>
                         <div className="text-xs opacity-50 max-w-[400px]" style={{ color: 'var(--text-secondary)' }}>
-                            {t('options.importExportDesc') || '通过标准 JSON 或 folia-theme 文本导入/导出配色主题与歌词动画设置。'}
+                            {t('options.importExportDesc')}
                         </div>
                     </div>
 
                     <div className="space-y-1.5 pt-1">
                         <div className="text-xs font-semibold opacity-60" style={{ color: 'var(--text-secondary)' }}>
-                            {t('options.exportThemeLabel') || '导出时包含的主题'}
+                            {t('options.exportThemeLabel')}
                         </div>
                         <div className="flex flex-wrap gap-2 mt-1">
                             {aiTheme && (
@@ -938,7 +994,7 @@ const AppearanceSettingsSubview: React.FC<AppearanceSettingsSubviewProps> = ({
                                     style={getAccentOptionStyle(exportThemeType === 'ai')}
                                 >
                                     <Palette size={12} className="opacity-70" />
-                                    <span>{t('options.exportAiTheme') || 'AI 主题'}: {aiTheme.light.name || 'AI'}</span>
+                                    <span>{t('options.exportAiTheme')}: {aiTheme.light.name || 'AI'}</span>
                                 </button>
                             )}
                             {customTheme && (
@@ -949,7 +1005,7 @@ const AppearanceSettingsSubview: React.FC<AppearanceSettingsSubviewProps> = ({
                                     style={getAccentOptionStyle(exportThemeType === 'custom')}
                                 >
                                     <Palette size={12} className="opacity-70" />
-                                    <span>{t('options.exportCustomTheme') || '自定义主题'}: {customTheme.light.name || 'Custom'}</span>
+                                    <span>{t('options.exportCustomTheme')}: {customTheme.light.name || 'Custom'}</span>
                                 </button>
                             )}
                             <button
@@ -959,7 +1015,7 @@ const AppearanceSettingsSubview: React.FC<AppearanceSettingsSubviewProps> = ({
                                 style={getAccentOptionStyle(exportThemeType === 'none')}
                             >
                                 <Settings2 size={12} className="opacity-70" />
-                                <span>{t('options.exportNoTheme') || '不包含主题'}</span>
+                                <span>{t('options.exportNoTheme')}</span>
                             </button>
                         </div>
                     </div>
@@ -967,7 +1023,7 @@ const AppearanceSettingsSubview: React.FC<AppearanceSettingsSubviewProps> = ({
                     <textarea
                         value={importText}
                         onChange={(e) => setImportText(e.target.value)}
-                        placeholder={t('options.importPlaceholder') || '在此处粘贴备份文本，或直接输入标准 JSON...'}
+                        placeholder={t('options.importPlaceholder')}
                         className="w-full h-24 px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-xs focus:outline-none focus:border-white/30 transition-colors font-mono resize-none"
                         style={{ color: 'var(--text-primary)' }}
                     />
@@ -980,7 +1036,7 @@ const AppearanceSettingsSubview: React.FC<AppearanceSettingsSubviewProps> = ({
                             style={{ color: 'var(--text-primary)' }}
                         >
                             {copiedType === 'shortcode' ? <Check size={13} className="text-green-500" /> : <Copy size={13} />}
-                            <span>{copiedType === 'shortcode' ? (t('status.copied') || '已复制') : (t('options.exportBtn') || '复制配置码')}</span>
+                            <span>{copiedType === 'shortcode' ? (t('status.copied')) : t('options.exportBtn')}</span>
                         </button>
                         <button
                             type="button"
@@ -989,7 +1045,7 @@ const AppearanceSettingsSubview: React.FC<AppearanceSettingsSubviewProps> = ({
                             style={{ color: 'var(--text-primary)' }}
                         >
                             {copiedType === 'json' ? <Check size={13} className="text-green-500" /> : <Copy size={13} />}
-                            <span>{copiedType === 'json' ? (t('status.copied') || '已复制') : '复制 JSON'}</span>
+                            <span>{copiedType === 'json' ? (t('status.copied')) : t('options.importBtn')}</span>
                         </button>
                         <div className="flex-1 min-w-[20px]" />
                         <button
@@ -1000,7 +1056,7 @@ const AppearanceSettingsSubview: React.FC<AppearanceSettingsSubviewProps> = ({
                             style={{ color: 'var(--text-primary)', borderColor: accentOutlineColor }}
                         >
                             <Download size={13} />
-                            <span>{t('options.importBtn') || '导入配置'}</span>
+                            <span>{t('options.importBtn')}</span>
                         </button>
                     </div>
                 </div>
