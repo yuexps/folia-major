@@ -1030,7 +1030,7 @@ const ArtistGridView: React.FC<ArtistGridViewProps> = ({
                             </div>
 
                             <div className="flex-1 overflow-hidden mt-3 mb-2">
-                                <p className="text-xs opacity-65 leading-relaxed break-words wrap-break-word whitespace-pre-wrap">
+                                <p className="text-xs opacity-65 leading-relaxed wrap-break-word whitespace-pre-wrap">
                                     {item.description || t('options.noDescription') || '暂无详细介绍'}
                                 </p>
                             </div>
@@ -1177,7 +1177,7 @@ const ArtistGridView: React.FC<ArtistGridViewProps> = ({
                 {showSearchPanel && (
                     <motion.div
                         {...gridSearchPanelMotion}
-                        className="absolute top-24 left-1/2 z-[85] w-[min(28rem,calc(100%-2rem))] -translate-x-1/2 pointer-events-auto"
+                        className="absolute top-24 left-1/2 z-85 w-[min(28rem,calc(100%-2rem))] -translate-x-1/2 pointer-events-auto"
                     >
                         <div className="relative rounded-full border shadow-2xl backdrop-blur-2xl theme-glass-panel">
                             <Search className="absolute left-4 top-1/2 -translate-y-1/2 opacity-40 w-4 h-4" />
@@ -1234,7 +1234,7 @@ const ArtistGridView: React.FC<ArtistGridViewProps> = ({
                         const generation = ++loadGenerationRef.current;
                         void loadNeteaseAlbumPages(Number(collection.id), generation, albums.length);
                     }}
-                    className="absolute right-6 top-5 z-[70] flex items-center gap-2 rounded-full px-3 py-2 text-xs backdrop-blur-md"
+                    className="absolute right-6 top-5 z-70 flex items-center gap-2 rounded-full px-3 py-2 text-xs backdrop-blur-md"
                     style={{ backgroundColor: 'color-mix(in srgb, var(--bg-color) 65%, transparent)' }}
                     title={t('playlist.loading')}
                 >

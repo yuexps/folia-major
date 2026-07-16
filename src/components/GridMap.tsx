@@ -734,7 +734,7 @@ export const GridMap: React.FC<GridMapProps> = ({
                     {showSearchPanel && (
                         <motion.div
                             {...gridSearchPanelMotion}
-                            className="absolute top-24 left-1/2 z-[85] w-[min(28rem,calc(100%-2rem))] -translate-x-1/2 pointer-events-auto"
+                            className="absolute top-24 left-1/2 z-85 w-[min(28rem,calc(100%-2rem))] -translate-x-1/2 pointer-events-auto"
                         >
                             <div className="relative rounded-full border shadow-2xl backdrop-blur-2xl theme-glass-panel">
                                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 opacity-40 w-4 h-4" />
