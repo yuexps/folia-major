@@ -104,14 +104,14 @@ const EMPTY_STAGE_ENTRY_KEY = '__empty-stage-entry__';
 
 const tryOnlineScrapingLyrics = async (title: string, artist: string, durationMs: number): Promise<LyricData | null> => {
     try {
-        console.log('[NowPlaying][Scraper] Initiating multi-source auto-match for:', title, artist, durationMs);
+        console.log('[NowPlaying][Scraper] 开始进行多源歌词自动匹配，歌曲：', title, artist, durationMs);
         const matchResult = await autoMatchBestLyric(title, artist, durationMs);
         if (matchResult && !('isPureMusic' in matchResult && matchResult.isPureMusic)) {
-            console.log('[NowPlaying][Scraper] Successfully matched lyrics from source:', (matchResult as any).source);
+            console.log('[NowPlaying][Scraper] 成功从源匹配到歌词：', (matchResult as any).source);
             return (matchResult as any).lyrics;
         }
     } catch (e) {
-        console.warn('[NowPlaying][Scraper] Error during autoMatchBestLyric:', e);
+        console.warn('[NowPlaying][Scraper] 自动匹配最佳歌词时出错：', e);
     }
     return null;
 };
@@ -131,6 +131,8 @@ const normalizeQueueSong = (raw: any): SongResult => {
         duration: Math.max(0, Math.floor((raw.durationMs || 0) / 1000)),
         sourceType: 'cloud',
         isStage: true,
+        filename: raw.filename || '',
+        path: raw.path || '',
     } as unknown as SongResult;
 };
 
@@ -414,7 +416,7 @@ export function useStagePlaybackController({
     const syncNowPlayingClock = useCallback((progressSec: number, durationSec: number, paused: boolean) => {
         const safeDuration = Math.max(0, durationSec);
         if (isDev) {
-            console.log('[NowPlaying][App] syncNowPlayingClock', {
+            console.log('[NowPlaying][App] 同步实时播放时钟', {
                 progressSec,
                 durationSec,
                 paused,
@@ -503,7 +505,7 @@ export function useStagePlaybackController({
         }
 
         if (isDev) {
-            console.log('[NowPlaying][App] Progress correction APPLIED', {
+            console.log('[NowPlaying][App] 进度校准已应用', {
                 source: options.source,
                 paused,
                 progressMs,
@@ -573,7 +575,7 @@ export function useStagePlaybackController({
                 lastQueryStatus: 'failed',
                 lastError: message,
             }));
-            console.warn('[NowPlaying] Failed to query precise progress', {
+            console.warn('[NowPlaying] 查询精确进度失败', {
                 source: options.source,
                 paused,
                 error: message,
@@ -799,7 +801,7 @@ export function useStagePlaybackController({
             try {
                 parsedLyrics = await LyricParserFactory.parse(nextLyricsSession.lyricSource as never);
             } catch (error) {
-                console.warn('[NowPlaying] Failed to parse now playing lyrics', error);
+                console.warn('[NowPlaying] 解析实时播放歌词失败：', error);
             }
         }
 
@@ -809,7 +811,13 @@ export function useStagePlaybackController({
             const artist = track?.artist || lyricPayload?.artist || '';
             const scraped = await tryOnlineScrapingLyrics(title, artist, track?.durationMs ?? lyricPayload?.durationMs ?? 0);
             if (scraped && nowPlayingContentLoadRequestIdRef.current === requestId) {
-                parsedLyrics = scraped;
+                const scrapedHasWordTiming = scraped.lines?.some(l => l.words && l.words.length > 0) ?? false;
+                const shouldApplyScraped = fromFullPlayerOverlay
+                    ? (lyricPayload?.lrc ? scrapedHasWordTiming : true)
+                    : true;
+                if (shouldApplyScraped) {
+                    parsedLyrics = scraped;
+                }
             }
         }
 
@@ -823,9 +831,23 @@ export function useStagePlaybackController({
         const fallbackAlbum = track?.album || '';
         const fallbackCoverUrl = track?.coverUrl || null;
         const resolvedDurationSec = durationSec || (renderableLyrics ? getStageLyricsTimelineBounds(renderableLyrics).endTimeSec : 0);
-        const fallbackSongId = fromFullPlayerOverlay && (fallbackTitle || fallbackArtist)
-            ? -Math.abs(hashCode(`${fallbackTitle}_${fallbackArtist}`) || 1)
-            : -Math.max(1, Math.floor(Date.now()));
+
+        let matchedSongIdFromQueue: string | number | null = null;
+        if (fromFullPlayerOverlay && track?.id) {
+            const trackIdStr = String(track.id);
+            const foundInQueue = playQueue.find(song => String(song.id) === trackIdStr);
+            if (foundInQueue) {
+                matchedSongIdFromQueue = foundInQueue.id;
+            }
+        }
+
+        const fallbackSongId = matchedSongIdFromQueue !== null
+            ? matchedSongIdFromQueue
+            : (fromFullPlayerOverlay && track?.id
+                ? (Number.isFinite(Number(track.id)) ? Number(track.id) : track.id)
+                : (fromFullPlayerOverlay && (fallbackTitle || fallbackArtist)
+                    ? -Math.abs(hashCode(`${fallbackTitle}_${fallbackArtist}`) || 1)
+                    : -Math.max(1, Math.floor(Date.now()))));
 
         const fallbackSong: SongResult | null = (track || lyricPayload) ? ({
             id: fallbackSongId,
@@ -839,6 +861,8 @@ export function useStagePlaybackController({
             sourceType: 'cloud',
             isStage: true,
             liked: track?.liked ?? false,
+            filename: track?.filename || '',
+            path: track?.path || '',
         } as SongResult) : null;
 
         let finalLyrics = renderableLyrics;
@@ -846,7 +870,7 @@ export function useStagePlaybackController({
         if (fromFullPlayerOverlay && fallbackSong) {
             try {
                 const state = await loadOnlineLyricsState(fallbackSong);
-                if (state) {
+                if (state && (state.lyricsSource === 'imported' || state.lyricsSource === 'online')) {
                     onlineState = state;
                     const resolved = resolveOnlineLyrics(state, renderableLyrics);
                     if (resolved) {
@@ -854,7 +878,7 @@ export function useStagePlaybackController({
                     }
                 }
             } catch (error) {
-                console.warn('[NowPlaying] Failed to load online lyrics state:', error);
+                console.warn('[NowPlaying] 加载在线歌词状态失败：', error);
             }
         }
 
@@ -1394,7 +1418,7 @@ export function useStagePlaybackController({
         syncNowPlayingClock(displayTime, Math.max(durationSec, displayTime), nowPlayingPaused);
 
         if (isDev) {
-            console.log('[NowPlaying][App] Syncing pause state into currentTime', {
+            console.log('[NowPlaying][App] 同步暂停状态至当前播放时间', {
                 displayTime,
                 nowPlayingPaused,
                 durationSec,

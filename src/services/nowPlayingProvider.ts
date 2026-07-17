@@ -191,6 +191,9 @@ export const normalizeNowPlayingTrack = (raw: unknown): NowPlayingTrackSnapshot 
     const id = idValue === undefined || idValue === null ? null : String(idValue);
     const liked = typeof track.liked === 'boolean' ? track.liked : false;
 
+    const filename = typeof (track as any).filename === 'string' ? (track as any).filename.trim() : '';
+    const path = typeof (track as any).path === 'string' ? (track as any).path.trim() : '';
+
     if (!title && !artist && !album && !coverUrl && durationMs === 0 && !id) {
         return null;
     }
@@ -203,6 +206,8 @@ export const normalizeNowPlayingTrack = (raw: unknown): NowPlayingTrackSnapshot 
         coverUrl: coverUrl || null,
         durationMs: durationMs || null,
         liked,
+        filename: filename || undefined,
+        path: path || undefined,
     };
 };
 

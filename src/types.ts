@@ -362,6 +362,8 @@ export interface NowPlayingTrackSnapshot {
   isVideo?: boolean;
   isAdvertisement?: boolean;
   liked?: boolean;
+  filename?: string;
+  path?: string;
 }
 
 export interface NowPlayingLyricPayload {

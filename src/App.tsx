@@ -1164,7 +1164,7 @@ export default function App() {
         clearPersistedStagePlaybackCache,
         loadLocalSongs,
         loadLocalPlaylists,
-        canRestoreSession: windowPlaybackHandoffRestoreStatus === 'none',
+        canRestoreSession: windowPlaybackHandoffRestoreStatus === 'none' && !fromFullPlayerOverlay,
     });
 
     const {
